@@ -6,6 +6,13 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <PackageTags>SignalR;Postgres;PostgreSQL;Npgsql;ASP;ASPNET;ASPNETCORE</PackageTags>
+    <RepositoryUrl>https://github.com/IanWold/PostgreSignalR</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
   
   <ItemGroup>
@@ -15,6 +22,11 @@
   
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+      <None Include="..\LICENSE.txt" Pack="true" PackagePath=""/>
+      <None Include="..\README.md" Pack="true" PackagePath=""/>
   </ItemGroup>
 
 </Project>
