@@ -1,0 +1,24 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Publish
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+    - name: Pack
+      run: |
+        arrTag=(${GITHUB_REF//\// })
+        VERSION="${arrTag[2]}"
+        VERSION="${VERSION//v}"
+        dotnet pack -c Release -p:PackageVersion=$VERSION
+    - name: Publish
+      run: dotnet nuget push **/*.nupkg --source 'https://api.nuget.org/v3/index.json' --api-key ${{secrets.NUGET_KEY}}
