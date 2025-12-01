@@ -2,6 +2,8 @@
   <h1>PostgreSignalR</h1>
 
   Experimental, in-dev Postgres backplane for SignalR
+
+  <a href="https://www.nuget.org/packages/PostgreSignalR"><img alt="NuGet Version" src="https://img.shields.io/nuget/vpre/PostgreSignalR?style=for-the-badge&logo=nuget"></a>
 </div>
 
 ---
