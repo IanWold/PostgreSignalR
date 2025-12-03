@@ -59,6 +59,8 @@ Alpha and beta versions will progress through `0.x.0-alpha` and `0.x.0-beta`, wh
 
 Thank you for wanting to contribute! I'm very happy to accept any contributions. At the present moment the most required work is testing - either writing automated tests or manually testing on real SignalR applications. However, if you want to contribute in any other way that is also always welcome.
 
+Development should typically progress through: discussion, triaging into one or more issues, assigning issues, and opening a pull request. You can slot into any point in this process; for example, if there's an open issue you want to work on I'm happy to assign it to you even if you weren't part of the discussion before creating the issue! Below I've got some simple guidelines for different cases:
+
 * ❓ **Questions** should be asked by opening a discussion. To help keep things tidy, please read through the existing discussions and issues first in case your question is already answered or can be asked within one of those spaces.
 * 🛠️ **Issues** which are open and not assigned can be claimed - comment in the issue that you want to take it on and I'm happy to assign it to you! Be sure to mention if you ever need any assistance or clarification, I'll be able to help. If you take an issue on and it becomes apparent you're not going to be able to finish the work, that is OK too - just be sure to keep the issue informed about that development. If you take an issue on and go for a long period of time without checking in, I will reassign the issue.
 * 🐞 **Bugs** can be reported by opening an issue directly. Before submitting the bug please be sure you can answer the four bug questions: "What did you do?", "What happened?", "What did you expect to happen instead?", "Why did you expect that to happen?". Provide as much detail in your bug report as you can. Bug reports which can't provide enough detail to replicate or that can't answer the four bug questions will be rejected.
@@ -66,3 +68,4 @@ Thank you for wanting to contribute! I'm very happy to accept any contributions.
 * 💡 **New Features or Ideas** should start by opening a discussion instead of an issue. If that conversation results in wanting to move forward with the idea, one or more issues will be created that can then be taken on.
 
 When in doubt: ask a question! If you feel more comfortable you can also feel free to [reach me directly](https://ian.wold.guru/connect.html) for anything.
+
