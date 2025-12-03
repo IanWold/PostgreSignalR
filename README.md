@@ -35,7 +35,7 @@ builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_st
     // If you are using one Postgres database for multiple SignalR apps, you should
     // use a different prefix for each app.
     options.Prefix = "myapp";
-);
+});
 ```
 
 # Roadmap
@@ -65,3 +65,4 @@ Thank you for wanting to contribute! I'm very happy to accept any contributions.
 * 🔬 **New Tests or Example Apps** can be submitted directly with a PR, though anticipate some conversation in the PR to ensure that the new code is fitting into the broader picture correctly. It's good to start with a PR though, as a conceptual conversation around a specific test (for example) is unlikely to yield a productive result without having tangible code to look at.
 * 💡 **New Features or Ideas** should start by opening a discussion instead of an issue. If that conversation results in wanting to move forward with the idea, one or more issues will be created that can then be taken on.
 
+When in doubt: ask a question! If you feel more comfortable you can also feel free to [reach me directly](https://ian.wold.guru/connect.html) for anything.
