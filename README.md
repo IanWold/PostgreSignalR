@@ -53,6 +53,8 @@ Right now the library has been released on Nuget in an alpha version, denoting t
 * RC: Further changes to the interface are unlikely and testing has indicated that the product is stable
 * Prod: The library is ready for use in production systems
 
+Alpha and beta versions will progress through `0.x.0-alpha` and `0.x.0-beta`, while the release candidates will start at `1.0.0-rc.x`. `1.0.0` will be the first production release.
+
 # Contributing
 
 Thank you for wanting to contribute! I'm very happy to accept any contributions. At the present moment the most required work is testing - either writing automated tests or manually testing on real SignalR applications. However, if you want to contribute in any other way that is also always welcome.
@@ -62,3 +64,4 @@ Thank you for wanting to contribute! I'm very happy to accept any contributions.
 * 🐞 **Bugs** can be reported by opening an issue directly. Before submitting the bug please be sure you can answer the four bug questions: "What did you do?", "What happened?", "What did you expect to happen instead?", "Why did you expect that to happen?". Provide as much detail in your bug report as you can. Bug reports which can't provide enough detail to replicate or that can't answer the four bug questions will be rejected.
 * 🔬 **New Tests or Example Apps** can be submitted directly with a PR, though anticipate some conversation in the PR to ensure that the new code is fitting into the broader picture correctly. It's good to start with a PR though, as a conceptual conversation around a specific test (for example) is unlikely to yield a productive result without having tangible code to look at.
 * 💡 **New Features or Ideas** should start by opening a discussion instead of an issue. If that conversation results in wanting to move forward with the idea, one or more issues will be created that can then be taken on.
+
