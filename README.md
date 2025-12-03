@@ -13,3 +13,27 @@ PostgreSignalR is an attempt to create a backplane for SingalR using Postgres. W
 SignalR introduces a _backplane_ concept to solve this problem: a _single_ Redis instance that multiple SignalR servers connect to, allowing SignalR to route internal messages between distributed servers. This way when Server A sends a websocket message, SignalR can notify its peers across Redis, allowing Server B to deliver the same message to its clients.
 
 This is great, but what if [I really like Postgres](https://ian.wold.guru/Posts/just_use_postgresql.html) and want to use that instead of Redis? Postgres has [pub/sub functionality](https://www.postgresql.org/docs/current/sql-notify.html) not dissimilar to Redis, so it should be able to be used. While Microsoft only maintains an official backplane for Redis, it does expose the interfaces I need to implement in order to create a backplane using Postgres. This repository is an attempt to do just that; in fact, [the Redis backplane is open source under MIT](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/server/StackExchangeRedis), so this repository is built entirely off that codebase. The ASP MIT license has been copied to this repo.
+
+# Getting Started
+
+Setting up the Postgres backplane for SingalR is very simple. If you've configured the [official Redis backplane]() before these steps will be quite simple.
+
+1. You'll need a Postgres server of course; deploy a new one or use your exisitng database.
+2. Install the [PostgreSignalR Nuget package](https://www.nuget.org/packages/PostgreSignalR) in your server project.
+3. In your ASP setup logic, add the postgres backplane to the service builder:
+
+```csharp
+builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_string>");
+```
+
+4. Optionally, you can configure options for the backplane:
+
+```csharp
+builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_string>", options =>
+{
+    // Prefix is added to the channel names that PostgreSignalR publishes in Postgres
+    // If you are using one Postgres database for multiple SignalR apps, you should
+    // use a different prefix for each app.
+    options.Prefix = "myapp";
+);
+```
