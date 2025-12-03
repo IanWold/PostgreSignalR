@@ -8,7 +8,7 @@
 
 ---
 
-PostgreSignalR is an attempt to create a backplane for SingalR using Postgres. What the heck does that mean? [SignalR]() is an ASP.NET library for developing websocket applications, allowing bidirectional client and server communication. This is especially useful for applications where I want to send real-time notifications from my server to my clients. Websocket applications have an inherent horizontal scaling problem: if there are two server replicas with clients connected to each server, how would a client connected to Server A be able to be notified about an event originating on Server B?
+PostgreSignalR is an attempt to create a backplane for SingalR using Postgres. What does that all mean? [SignalR]() is an ASP.NET library for developing websocket applications, allowing bidirectional client and server communication. This is especially useful for applications where I want to send real-time notifications from my server to my clients. Websocket applications have an inherent horizontal scaling problem: if there are two server replicas with clients connected to each server, how would a client connected to Server A be able to be notified about an event originating on Server B?
 
 SignalR introduces a _backplane_ concept to solve this problem: a _single_ Redis instance that multiple SignalR servers connect to, allowing SignalR to route internal messages between distributed servers. This way when Server A sends a websocket message, SignalR can notify its peers across Redis, allowing Server B to deliver the same message to its clients.
 
@@ -68,4 +68,5 @@ Development should typically progress through: discussion, triaging into one or 
 * 💡 **New Features or Ideas** should start by opening a discussion instead of an issue. If that conversation results in wanting to move forward with the idea, one or more issues will be created that can then be taken on.
 
 When in doubt: ask a question! If you feel more comfortable you can also feel free to [reach me directly](https://ian.wold.guru/connect.html) for anything.
+
 
