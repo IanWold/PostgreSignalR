@@ -55,6 +55,40 @@ Right now the library has been released on Nuget in an alpha version, denoting t
 
 Alpha and beta versions will progress through `0.x.0-alpha` and `0.x.0-beta`, while the release candidates will start at `1.0.0-rc.x`. `1.0.0` will be the first production release.
 
+# Developing and Testing
+
+The backplane code tracks very closely to that of the [official Redis backplane](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/server/StackExchangeRedis), in fact this project started by cloning that code and changing it to use Postgres' notify/listen in lieu of Redis' pub/sub. Postgres and Redis function quite siilarly, for these purposes, so nothing major is changed in this repo. While there are a number of helper classes constructed to handle things like messagepack and acks, all of the main code is in [`PostgresHubLifetimeManager`](https://github.com/IanWold/PostgreSignalR/blob/main/PostgreSignalR/PostgresHubLifetimeManager.cs), which implements the essential `HubLifetimeManager` base class.
+
+One important difference between Redis and Postgres is that [Npgsql requires a blocked thread in order to listen to notifications in real-time](https://www.npgsql.org/doc/wait.html). This required developing a [new listener class to maintain a separate listening thread](https://github.com/IanWold/PostgreSignalR/blob/main/PostgreSignalR/PostgresListener.cs). Another departure from the reference code is implementing the [logger extension pattern](https://learn.microsoft.com/en-us/dotnet/core/extensions/high-performance-logging) to provide more logging in a performance-sensitive way.
+
+Going forward, there is no requirement that this codebase conforms to the architecture or general structure of the Redis backplane, this implementation was chose for ease. If any opportunities to improve the library come about and require a change to this structure, I'm happy to entertain that change.
+
+### Tests
+
+Being an inherently network-related product, integration tests provide the greatest source of confidence in the functionality of the backplane. [The integration test project](https://github.com/IanWold/PostgreSignalR/tree/main/PostgreSignalR.IntegrationTests) is set up well to be able to test various scenarios involving multiple servers and clients. These tests use [Testcontainers](https://dotnet.testcontainers.org/) to create a Postgres server with an individual Postgres database per-test. They also have a [standalone SignalR server](https://github.com/IanWold/PostgreSignalR/tree/main/PostgreSignalR.IntegrationTests.App) providing functionality to cover all of the SignalR use cases. The integration tests can create multiple, separate instances of this server on Docker, and for each server can create muliple, separate clients. This makes it easy to cover various scenarios:
+
+```csharp
+[Fact]
+public async Task Test()
+{
+    await using var server1 = await CreateServerAsync();
+    await using var server2 = await CreateServerAsync();
+    await using var client1 = await server1.CreateClientAsync();
+    await using var client2 = await server2.CreateClientAsync();
+
+    await client1.Send.SendToAll("hello");
+    var msg1 = await client2.ExpectMessageAsync(nameof(IClient.Receive));
+
+    Assert.Equal("hello", msg1.Arg<string>(0));
+}
+```
+
+### Building and Testing Locally
+
+To build, all you'll need is [the .NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). If you're interested in setting up a separate local project to use your development version of this library, you can follow [Microsoft's guide on local Nuget feeds](https://learn.microsoft.com/en-us/nuget/hosting-packages/local-feeds).
+
+In order to execute the tests locally, you'll need to have Docker installed. I recommend installing [Docker Desktop](https://www.docker.com/products/docker-desktop/) for ease of use, but any Docker-compatible container engine/interface should work fine. Docker Desktop works out of the box, for the most part. Your favorite C# IDE should have a test explorer, you can run the tests like normal from there, just be sure Docker is running before you run the tests. If you're using VSCode like I am, I recommend installing [the C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit).
+
 # Contributing
 
 Thank you for wanting to contribute! I'm very happy to accept any contributions. At the present moment the most required work is testing - either writing automated tests or manually testing on real SignalR applications. However, if you want to contribute in any other way that is also always welcome.
