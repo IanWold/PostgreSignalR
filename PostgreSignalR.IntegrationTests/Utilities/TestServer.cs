@@ -2,9 +2,9 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class TestServer(TestServerContainer container) : IAsyncDisposable
 {
-    public async Task<TestClient> CreateClientAsync()
+    public async Task<TestClient> CreateClientAsync(string? user = null)
     {
-        var client = await TestClient.CreateAsync(container.HubUri);
+        var client = await TestClient.CreateAsync(container.HubUri, user);
 
         using var httpClient = new HttpClient();
         var isReady = false;
