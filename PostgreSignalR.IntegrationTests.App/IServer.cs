@@ -6,4 +6,7 @@ public interface IServer
     Task SendToAll(string message);
     Task SendToCaller(string message);
     Task SendToOthers(string message);
+    Task JoinGroup(string groupName);
+    Task LeaveGroup(string groupName);
+    Task SendToGroup(string groupName, string message);
 }

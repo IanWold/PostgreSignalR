@@ -34,11 +34,11 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
         await connection.StartAsync();
     }
 
-    public static async Task<TestClient> CreateAsync(Uri address)
+    public static async Task<TestClient> CreateAsync(Uri address, string? user = null)
     {
         var client = new TestClient(
             new HubConnectionBuilder()
-                .WithUrl(address)
+                .WithUrl(AddUser(address, user))
                 .WithAutomaticReconnect()
                 .Build()
         );
@@ -46,16 +46,54 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
         await client.InitializeAsync();
         return client;
     }
+
+    private static Uri AddUser(Uri baseUri, string? user)
+    {
+        if (string.IsNullOrWhiteSpace(user)) return baseUri;
+
+        var sep = string.IsNullOrEmpty(baseUri.Query) ? "?" : "&";
+        return new Uri($"{baseUri}{sep}user={Uri.EscapeDataString(user)}");
+    }
     
     public Task<ClientMessage> ExpectMessageAsync(string key, TimeSpan? timeout = null)
     {
         var waiter = new TaskCompletionSource<ClientMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
         _waiters[key] = waiter;
 
-        using var cancellation = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(3));
-        cancellation.Token.Register(() => waiter.TrySetCanceled());
+        var cts = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(1));
+        var registration = cts.Token.Register(() => waiter.TrySetCanceled(cts.Token));
 
-        return waiter.Task;
+        return AwaitAndCleanupAsync(waiter.Task, cts, registration);
+    }
+
+    private static async Task<ClientMessage> AwaitAndCleanupAsync(Task<ClientMessage> task, CancellationTokenSource cts, CancellationTokenRegistration registration)
+    {
+        try
+        {
+            return await task.ConfigureAwait(false);
+        }
+        finally
+        {
+            registration.Dispose();
+            cts.Dispose();
+        }
+    }
+
+    public async Task EnsureNoMessageAsync(string key, TimeSpan? timeout = null)
+    {
+        try
+        {
+            await ExpectMessageAsync(key, timeout ?? TimeSpan.FromMilliseconds(250));
+            throw new Xunit.Sdk.XunitException($"Unexpected message for key '{key}'.");
+        }
+        catch (TaskCanceledException)
+        {
+            // expected
+        }
+        catch (OperationCanceledException)
+        {
+            // expected
+        }
     }
 
     public async ValueTask DisposeAsync()
