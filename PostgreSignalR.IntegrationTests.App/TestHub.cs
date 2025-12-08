@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.SignalR;
+using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests.App;
 
-public class TestHub : Hub<IClient>, IServer
+public class TestHub() : Hub<IClient>, IServer
 {
     public override async Task OnConnectedAsync() =>
         await base.OnConnectedAsync();
@@ -44,4 +45,30 @@ public class TestHub : Hub<IClient>, IServer
 
     public async Task SendToUsers(string[] userIds, string message) =>
         await Clients.Users(userIds).ReceiveUser(message);
+
+    public async Task SendToAllExcept(string message, string excludedConnectionId) =>
+        await Clients.AllExcept([excludedConnectionId]).Receive(message);
+
+    public Task<string> EchoWithServerId(string message) =>
+        Task.FromResult($"{Environment.MachineName}:{Context.ConnectionId}:{message}");
+
+    public async IAsyncEnumerable<string> StreamSequence(int count, string prefix)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            yield return $"{prefix}-{i}";
+            await Task.Delay(1);
+        }
+    }
+
+    public async Task<string> InvokeConnectionEcho(string connectionId, string message) =>
+        await Clients.Client(connectionId).EchoBack(message);
+
+    public async Task SendStreamToConnection(string connectionId, int count, string prefix)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            await Clients.Client(connectionId).ReceiveStreamItem($"{prefix}-{i}");
+        }
+    }
 }

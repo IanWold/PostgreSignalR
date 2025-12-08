@@ -468,11 +468,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
             {
                 // TODO: Need to handle other server going away while waiting for connection result
                 var messageBytes = _protocol.WriteInvocation(methodName, args, invocationId, returnChannel: _channels.ReturnResults);
-                var received = await PublishAsync(_channels.Connection(connectionId), messageBytes);
-                if (received < 1)
-                {
-                    throw new IOException($"Connection '{connectionId}' does not exist.");
-                }
+                await PublishAsync(_channels.Connection(connectionId), messageBytes);
             }
             else
             {

@@ -3,7 +3,8 @@ using PostgreSignalR;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
-public static class DependencyInjectionExtensions {
+public static class DependencyInjectionExtensions
+{
     /// <summary>
     /// Adds scale-out to a <see cref="ISignalRServerBuilder"/>, using a shared Postgres database.
     /// </summary>

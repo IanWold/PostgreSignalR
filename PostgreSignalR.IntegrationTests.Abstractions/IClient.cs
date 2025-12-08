@@ -1,4 +1,4 @@
-namespace PostgreSignalR.IntegrationTests.App;
+namespace PostgreSignalR.IntegrationTests.Abstractions;
 
 public interface IClient
 {
@@ -9,4 +9,6 @@ public interface IClient
     Task ReceiveGroupRemoval(string message);
     Task ReceiveConnection(string message);
     Task ReceiveUser(string message);
+    Task ReceiveStreamItem(string message);
+    Task<string> EchoBack(string message);
 }
