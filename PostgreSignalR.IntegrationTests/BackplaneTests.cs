@@ -97,4 +97,81 @@ public class BackplaneTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Equal("after-remove", (await m1).Arg<string>(0));
         await member2.EnsureNoMessageAsync(nameof(IClient.ReceiveGroup));
     }
+
+    [Fact]
+    public async Task Connection_TargetsSingleConnection()
+    {
+        await using var server1 = await CreateServerAsync();
+        await using var server2 = await CreateServerAsync();
+        await using var sender = await server1.CreateClientAsync();
+        await using var target = await server2.CreateClientAsync();
+        await using var bystander = await server2.CreateClientAsync();
+
+        var targetId = await target.Send.GetConnectionId();
+        var recv = target.ExpectMessageAsync(nameof(IClient.ReceiveConnection));
+
+        await sender.Send.SendToConnection(targetId, "direct");
+
+        Assert.Equal("direct", (await recv).Arg<string>(0));
+        await bystander.EnsureNoMessageAsync(nameof(IClient.ReceiveConnection));
+    }
+
+    [Fact]
+    public async Task Connections_TargetsMultiple()
+    {
+        await using var server1 = await CreateServerAsync();
+        await using var server2 = await CreateServerAsync();
+        await using var sender = await server1.CreateClientAsync();
+        await using var target1 = await server2.CreateClientAsync();
+        await using var target2 = await server1.CreateClientAsync();
+
+        var t1 = await target1.Send.GetConnectionId();
+        var t2 = await target2.Send.GetConnectionId();
+
+        var r1 = target1.ExpectMessageAsync(nameof(IClient.ReceiveConnection));
+        var r2 = target2.ExpectMessageAsync(nameof(IClient.ReceiveConnection));
+
+        await sender.Send.SendToConnections(new[] { t1, t2 }, "multi");
+
+        Assert.Equal("multi", (await r1).Arg<string>(0));
+        Assert.Equal("multi", (await r2).Arg<string>(0));
+    }
+
+    [Fact]
+    public async Task Users_SendToUserHitsAllConnections()
+    {
+        await using var server1 = await CreateServerAsync();
+        await using var server2 = await CreateServerAsync();
+        await using var user1a = await server1.CreateClientAsync("u1");
+        await using var user1b = await server2.CreateClientAsync("u1");
+        await using var user2 = await server2.CreateClientAsync("u2");
+
+        var r1 = user1a.ExpectMessageAsync(nameof(IClient.ReceiveUser));
+        var r2 = user1b.ExpectMessageAsync(nameof(IClient.ReceiveUser));
+
+        await user2.Send.SendToUser("u1", "user-msg");
+
+        Assert.Equal("user-msg", (await r1).Arg<string>(0));
+        Assert.Equal("user-msg", (await r2).Arg<string>(0));
+        await user2.EnsureNoMessageAsync(nameof(IClient.ReceiveUser));
+    }
+
+    [Fact]
+    public async Task Users_SendToUsersHitsMultipleUsers()
+    {
+        await using var server1 = await CreateServerAsync();
+        await using var server2 = await CreateServerAsync();
+        await using var user1 = await server1.CreateClientAsync("u1");
+        await using var user2 = await server2.CreateClientAsync("u2");
+        await using var user3 = await server2.CreateClientAsync("u3");
+
+        var r1 = user1.ExpectMessageAsync(nameof(IClient.ReceiveUser));
+        var r2 = user2.ExpectMessageAsync(nameof(IClient.ReceiveUser));
+
+        await user3.Send.SendToUsers(new[] { "u1", "u2" }, "multi-user");
+
+        Assert.Equal("multi-user", (await r1).Arg<string>(0));
+        Assert.Equal("multi-user", (await r2).Arg<string>(0));
+        await user3.EnsureNoMessageAsync(nameof(IClient.ReceiveUser));
+    }
 }
