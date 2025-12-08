@@ -10,7 +10,7 @@
     <PackageTags>SignalR;Postgres;PostgreSQL;Npgsql;ASP;ASPNET;ASPNETCORE</PackageTags>
     <RepositoryUrl>https://github.com/IanWold/PostgreSignalR</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReadmeFile>README_NUGET.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
   </PropertyGroup>
   

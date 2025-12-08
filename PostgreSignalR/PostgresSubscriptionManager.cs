@@ -14,8 +14,6 @@ internal sealed class PostgresSubscriptionManager
 
         try
         {
-            // Avoid adding subscription if connection is closing/closed
-            // We're in a lock and ConnectionAborted is triggered before OnDisconnectedAsync is called so this is guaranteed to be safe when adding while connection is closing and removing items
             if (connection.ConnectionAborted.IsCancellationRequested)
             {
                 return;
@@ -25,7 +23,6 @@ internal sealed class PostgresSubscriptionManager
 
             subscription.Add(connection);
 
-            // Subscribe once
             if (subscription.Count == 1)
             {
                 await subscribeMethod(id, subscription);

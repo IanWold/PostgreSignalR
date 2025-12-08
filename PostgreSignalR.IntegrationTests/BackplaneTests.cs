@@ -131,7 +131,7 @@ public class BackplaneTests(ContainerFixture fixture) : BaseTest(fixture)
         var r1 = target1.ExpectMessageAsync(nameof(IClient.ReceiveConnection));
         var r2 = target2.ExpectMessageAsync(nameof(IClient.ReceiveConnection));
 
-        await sender.Send.SendToConnections(new[] { t1, t2 }, "multi");
+        await sender.Send.SendToConnections([t1, t2], "multi");
 
         Assert.Equal("multi", (await r1).Arg<string>(0));
         Assert.Equal("multi", (await r2).Arg<string>(0));
@@ -168,7 +168,7 @@ public class BackplaneTests(ContainerFixture fixture) : BaseTest(fixture)
         var r1 = user1.ExpectMessageAsync(nameof(IClient.ReceiveUser));
         var r2 = user2.ExpectMessageAsync(nameof(IClient.ReceiveUser));
 
-        await user3.Send.SendToUsers(new[] { "u1", "u2" }, "multi-user");
+        await user3.Send.SendToUsers(["u1", "u2"], "multi-user");
 
         Assert.Equal("multi-user", (await r1).Arg<string>(0));
         Assert.Equal("multi-user", (await r2).Arg<string>(0));
