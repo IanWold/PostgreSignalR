@@ -19,6 +19,8 @@ public class TestHub : Hub<IClient>, IServer
     public async Task SendToOthers(string message) =>
         await Clients.Others.ReceiveOthers(message);
 
+    public Task<string> GetConnectionId() => Task.FromResult(Context.ConnectionId);
+
     public async Task JoinGroup(string groupName) =>
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
@@ -27,4 +29,19 @@ public class TestHub : Hub<IClient>, IServer
 
     public async Task SendToGroup(string groupName, string message) =>
         await Clients.Group(groupName).ReceiveGroup(message);
+
+    public async Task SendToGroupExcept(string groupName, string excludedConnectionId, string message) =>
+        await Clients.GroupExcept(groupName, new[] { excludedConnectionId }).ReceiveGroup(message);
+
+    public async Task SendToConnection(string connectionId, string message) =>
+        await Clients.Client(connectionId).ReceiveConnection(message);
+
+    public async Task SendToConnections(string[] connectionIds, string message) =>
+        await Clients.Clients(connectionIds).ReceiveConnection(message);
+
+    public async Task SendToUser(string userId, string message) =>
+        await Clients.User(userId).ReceiveUser(message);
+
+    public async Task SendToUsers(string[] userIds, string message) =>
+        await Clients.Users(userIds).ReceiveUser(message);
 }

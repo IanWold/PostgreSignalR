@@ -6,8 +6,8 @@ namespace PostgreSignalR;
 
 public sealed class PostgresListener(string connectionString) : IAsyncDisposable
 {
-    private readonly CancellationTokenSource _cts = new();        // global shutdown
-    private CancellationTokenSource _waitCts = new();              // cancels WaitAsync only
+    private readonly CancellationTokenSource _cts = new();
+    private CancellationTokenSource _waitCts = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly HashSet<string> _channels = new(StringComparer.Ordinal);
 
@@ -35,11 +35,9 @@ public sealed class PostgresListener(string connectionString) : IAsyncDisposable
             await _conn.OpenAsync(_cts.Token);
             _conn.Notification += (_, e) => OnNotification?.Invoke(this, e);
 
-            // Subscribe to any pre-added channels
             if (_channels.Count > 0)
                 await ExecAsync(BuildListenSql(_channels), _cts.Token);
 
-            // (re)create a fresh wait CTS and start the pump
             _waitCts?.Dispose();
             _waitCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
             _pumpTask = Task.Run(() => PumpAsync(), _cts.Token);
@@ -55,12 +53,11 @@ public sealed class PostgresListener(string connectionString) : IAsyncDisposable
         {
             if (!_channels.Add(channel)) return;
 
-            // Enqueue LISTEN and poke the waiter
             _ops.Enqueue(async (conn, tok) =>
             {
-                await ExecAsync($"LISTEN {channel};", tok, conn);
+                await ExecAsync($"LISTEN {channel.EscapeQutoes()};", tok, conn);
             });
-            _waitCts.Cancel(); // wake Pump to apply the change
+            _waitCts.Cancel();
         }
         finally { _gate.Release(); }
     }
@@ -75,7 +72,7 @@ public sealed class PostgresListener(string connectionString) : IAsyncDisposable
 
             _ops.Enqueue(async (conn, tok) =>
             {
-                await ExecAsync($"UNLISTEN {channel};", tok, conn);
+                await ExecAsync($"UNLISTEN {channel.EscapeQutoes()};", tok, conn);
             });
             _waitCts.Cancel();
         }
@@ -111,8 +108,6 @@ public sealed class PostgresListener(string connectionString) : IAsyncDisposable
         finally { _gate.Release(); _gate.Dispose(); _cts.Dispose(); }
     }
 
-    // ============================ Internals ============================
-
     private async Task PumpAsync()
     {
         while (!_cts.IsCancellationRequested)
@@ -122,39 +117,34 @@ public sealed class PostgresListener(string connectionString) : IAsyncDisposable
 
             try
             {
-                // Block until a notification or until we’re asked to reconfigure
                 await localConn.WaitAsync(_waitCts.Token);
             }
             catch (OperationCanceledException)
             {
                 if (_cts.IsCancellationRequested) break; // shutting down
 
-                // Reconfigure: swap tokens, drain and run queued ops
                 await _gate.WaitAsync(CancellationToken.None);
                 try
                 {
                     _waitCts.Dispose();
                     _waitCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
 
-                    // drain ops
                     while (_ops.TryDequeue(out var op))
                     {
                         try { await op(localConn, _cts.Token); }
                         catch
                         {
-                            // If LISTEN/UNLISTEN failed (e.g., connection hiccup), force reconnect
                             await ReconnectAsync(_cts.Token);
-                            localConn = _conn!; // replaced
+                            localConn = _conn!;
                         }
                     }
                 }
                 finally { _gate.Release(); }
 
-                continue; // resume waiting with fresh token
+                continue;
             }
             catch
             {
-                // Connection error: reconnect and re-LISTEN everything
                 await ReconnectAsync(_cts.Token);
             }
         }
@@ -175,7 +165,6 @@ public sealed class PostgresListener(string connectionString) : IAsyncDisposable
             if (_channels.Count > 0)
                 await ExecAsync(BuildListenSql(_channels), ct);
 
-            // reset waiter so Pump uses a valid token after reconnect
             _waitCts.Cancel();
         }
         finally { _gate.Release(); }
@@ -184,7 +173,11 @@ public sealed class PostgresListener(string connectionString) : IAsyncDisposable
     private static string BuildListenSql(IEnumerable<string> channels)
     {
         var sb = new StringBuilder();
-        foreach (var ch in channels) sb.Append("LISTEN ").Append(ch).Append(';');
+        foreach (var channel in channels)
+        {
+            sb.Append("LISTEN ").Append(channel.EscapeQutoes()).Append(';');
+        }
+
         return sb.ToString();
     }
 

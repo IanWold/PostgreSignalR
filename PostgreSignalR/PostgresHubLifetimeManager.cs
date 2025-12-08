@@ -29,7 +29,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
     private readonly string _serverName = GenerateServerName();
     private readonly PostgresProtocol _protocol;
     private readonly SemaphoreSlim _commandLock = new(1);
-    private readonly ConcurrentDictionary<string, Action<byte[]>> _notificationHandlers = [];
+    private readonly ConcurrentDictionary<string, Action<byte[]>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ClientResultsManager _clientResultsManager = new();
     private readonly PostgresListener _postgresListener;
     private int _internalAckId;
@@ -339,7 +339,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
             using var connection = new NpgsqlConnection(_options.ConnectionString);
             await connection.OpenAsync();
 
-            using var notifyCommand = new NpgsqlCommand($"NOTIFY {channel}, '{payload}';", connection);
+            using var notifyCommand = new NpgsqlCommand($"NOTIFY {channel.EscapeQutoes()}, '{payload}';", connection);
             return await notifyCommand.ExecuteNonQueryAsync();
         }
         catch (Exception ex)
