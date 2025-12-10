@@ -1,4 +1,3 @@
-
 namespace PostgreSignalR.IntegrationTests;
 
 public class BaseTest(ContainerFixture fixture) : IAsyncLifetime

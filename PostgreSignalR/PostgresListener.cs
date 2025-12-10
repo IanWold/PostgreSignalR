@@ -4,7 +4,7 @@ using System.Text;
 
 namespace PostgreSignalR;
 
-public sealed class PostgresListener(string connectionString) : IAsyncDisposable
+internal sealed class PostgresListener(string connectionString) : IAsyncDisposable
 {
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _gate = new(1, 1);

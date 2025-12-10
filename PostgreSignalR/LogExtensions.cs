@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 
 namespace PostgreSignalR;
 
-public static partial class LogExtensions
+internal static partial class LogExtensions
 {
     [LoggerMessage(
         EventId = 0,
