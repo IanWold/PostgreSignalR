@@ -7,12 +7,7 @@ using Microsoft.AspNetCore.SignalR.Protocol;
 
 namespace PostgreSignalR;
 
-internal readonly struct PostgresInvocation(
-    SerializedHubMessage message,
-    IReadOnlyList<string>? excludedConnectionIds,
-    string? invocationId = null,
-    string? returnChannel = null
-)
+internal readonly struct PostgresInvocation(SerializedHubMessage message, IReadOnlyList<string>? excludedConnectionIds, string? invocationId = null, string? returnChannel = null)
 {
     /// <summary>
     /// Gets a list of connections that should be excluded from this invocation.
