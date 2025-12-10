@@ -10,7 +10,7 @@ WORKDIR /src/PostgreSignalR.IntegrationTests.App
 RUN dotnet publish -c Release -o /app/publish --framework net9.0 --no-cache
 
 # Runtime Stage
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish ./
 
