@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.DependencyInjection;
 using PostgreSignalR.IntegrationTests.Abstractions;
 using TypedSignalR.Client;
 
@@ -12,8 +11,14 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
 
     private IServer? _serverProxy;
 
+#if NET10_0_OR_GREATER
     private ClientReceiver Receiver =>
         field ??= new(ReceiverCallback);
+#else
+    private ClientReceiver? _receiver;
+    private ClientReceiver Receiver =>
+        _receiver ??= new(ReceiverCallback);
+#endif
 
     public IServer Send =>
         _serverProxy ?? throw new Exception("Not initialized!");
