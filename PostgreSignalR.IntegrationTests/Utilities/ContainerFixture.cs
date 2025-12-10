@@ -26,7 +26,13 @@ public class ContainerFixture : IAsyncLifetime
 
             var testServerImage = new ImageFromDockerfileBuilder()
                 .WithDockerfileDirectory(CommonDirectoryPath.GetSolutionDirectory().DirectoryPath)
-                .WithDockerfile("Dockerfile.integrationTests")
+#if NET10_0
+                .WithDockerfile("Dockerfile.integrationTests.10")
+#elif NET9_0
+                .WithDockerfile("Dockerfile.integrationTests.9")
+#elif NET8_0
+                .WithDockerfile("Dockerfile.integrationTests.8")
+#endif
                 .Build();
 
             await testServerImage.CreateAsync();
