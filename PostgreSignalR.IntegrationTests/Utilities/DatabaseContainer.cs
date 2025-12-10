@@ -22,7 +22,7 @@ public class DatabaseContainer(string connectionString) : IAsyncLifetime
         }
         .ConnectionString;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
@@ -32,7 +32,7 @@ public class DatabaseContainer(string connectionString) : IAsyncLifetime
         await createDatabaseCommand.ExecuteNonQueryAsync();
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
@@ -44,5 +44,7 @@ public class DatabaseContainer(string connectionString) : IAsyncLifetime
 
         await using var dropDatabaseCommand = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_uniqueName}\";", connection);
         await dropDatabaseCommand.ExecuteNonQueryAsync();
+
+        GC.SuppressFinalize(this);
     }
 }

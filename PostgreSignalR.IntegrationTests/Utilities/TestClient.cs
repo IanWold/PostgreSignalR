@@ -1,12 +1,14 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR.Client;
-using PostgreSignalR.IntegrationTests.App;
+using Microsoft.Extensions.DependencyInjection;
+using PostgreSignalR.IntegrationTests.Abstractions;
+using TypedSignalR.Client;
 
 namespace PostgreSignalR.IntegrationTests;
 
 public class TestClient(HubConnection connection) : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, TaskCompletionSource<ClientMessage>> _waiters = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ConcurrentQueue<TaskCompletionSource<ClientMessage>>> _waiters = new(StringComparer.OrdinalIgnoreCase);
 
     private IServer? _serverProxy;
 
@@ -18,9 +20,18 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
 
     private Task ReceiverCallback(string key, object?[] args)
     {
-        if (_waiters.TryRemove(key, out var waiter))
+        if (_waiters.TryGetValue(key, out var queue))
         {
-            waiter.TrySetResult(new ClientMessage(key, args));
+            while (queue.TryDequeue(out var waiter))
+            {
+                if (waiter.Task.IsCanceled)
+                {
+                    continue;
+                }
+
+                waiter.TrySetResult(new ClientMessage(key, args));
+                break;
+            }
         }
 
         return Task.CompletedTask;
@@ -28,8 +39,8 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
 
     private async Task InitializeAsync()
     {
-        connection.ClientRegistration<IClient>(Receiver);
-        _serverProxy = connection.ServerProxy<IServer>();
+        connection.Register<IClient>(Receiver);
+        _serverProxy = connection.CreateHubProxy<IServer>();
         
         await connection.StartAsync();
     }
@@ -58,7 +69,8 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
     public Task<ClientMessage> ExpectMessageAsync(string key, TimeSpan? timeout = null)
     {
         var waiter = new TaskCompletionSource<ClientMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _waiters[key] = waiter;
+        var queue = _waiters.GetOrAdd(key, _ => new ConcurrentQueue<TaskCompletionSource<ClientMessage>>());
+        queue.Enqueue(waiter);
 
         var cts = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(1));
         var registration = cts.Token.Register(() => waiter.TrySetCanceled(cts.Token));

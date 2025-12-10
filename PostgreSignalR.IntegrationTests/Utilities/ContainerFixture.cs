@@ -1,12 +1,19 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Images;
 using DotNet.Testcontainers.Networks;
+using PostgreSignalR.IntegrationTests;
 using Testcontainers.PostgreSql;
+
+[assembly: AssemblyFixture(typeof(ContainerFixture))]
 
 namespace PostgreSignalR.IntegrationTests;
 
 public class ContainerFixture : IAsyncLifetime
 {
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private Task<Containers>? _containersTask;
+    private bool _disposed;
+
     private record Containers(INetwork Network, IFutureDockerImage TestServerImage, PostgreSqlContainer PostgresContainer) : IAsyncDisposable
     {
         public static async Task<Containers> CreateAsync()
@@ -46,26 +53,44 @@ public class ContainerFixture : IAsyncLifetime
             await PostgresContainer.DisposeAsync();
         }
     }
-    
-    private Containers? TestContainers { get; set; }
+
+    private async Task<Containers> EnsureContainersAsync()
+    {
+        if (_containersTask is not null)
+        {
+            return await _containersTask;
+        }
+
+        await _gate.WaitAsync();
+        try
+        {
+            _containersTask ??= Containers.CreateAsync();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        return await _containersTask;
+    }
 
     public async Task<DatabaseContainer> GetDatabaseAsync()
     {
-        TestContainers ??= await Containers.CreateAsync();
+        var containers = await EnsureContainersAsync();
 
-        var database = new DatabaseContainer(TestContainers.PostgresContainer.GetConnectionString());
+        var database = new DatabaseContainer(containers.PostgresContainer.GetConnectionString());
         await database.InitializeAsync();
         return database;
     }
 
     public async Task<TestServerContainer> CreateTestServerAsync(DatabaseContainer database)
     {
-        TestContainers ??= await Containers.CreateAsync();
+        var containers = await EnsureContainersAsync();
 
         var container = new ContainerBuilder()
-            .WithImage(TestContainers.TestServerImage)
+            .WithImage(containers.TestServerImage)
             .WithName($"signalr-test-{Guid.NewGuid():N}")
-            .WithNetwork(TestContainers!.Network)
+            .WithNetwork(containers.Network)
             .WithEnvironment("ConnectionStrings__Postgres", database.ConnectionStringInternal)
             .WithPortBinding(8080, assignRandomHostPort: true)
             .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8080))
@@ -75,10 +100,20 @@ public class ContainerFixture : IAsyncLifetime
         return new TestServerContainer(container!);
     }
 
-    public async Task InitializeAsync() { }
+    public async ValueTask InitializeAsync() { }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        await TestContainers!.DisposeAsync();
+        if (_disposed) return;
+        _disposed = true;
+
+        if (_containersTask is not null)
+        {
+            var containers = await _containersTask;
+            await containers.DisposeAsync();
+        }
+
+        _gate.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

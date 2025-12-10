@@ -4,6 +4,7 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Project Path="PostgreSignalR.IntegrationTests.Abstractions/PostgreSignalR.IntegrationTests.Abstractions.csproj" />
   <Project Path="PostgreSignalR.IntegrationTests.App/PostgreSignalR.IntegrationTests.App.csproj" />
   <Project Path="PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj" />
   <Project Path="PostgreSignalR/PostgreSignalR.csproj" />

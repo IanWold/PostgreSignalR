@@ -1,8 +1,8 @@
-using PostgreSignalR.IntegrationTests.App;
+using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class BackplaneTests(ContainerFixture fixture) : BaseTest(fixture)
+public class UserTargetingTests(ContainerFixture fixture) : BaseTest(fixture)
 {
     [Fact]
     public async Task Broadcast_AllServersReceive()
@@ -135,6 +135,27 @@ public class BackplaneTests(ContainerFixture fixture) : BaseTest(fixture)
 
         Assert.Equal("multi", (await r1).Arg<string>(0));
         Assert.Equal("multi", (await r2).Arg<string>(0));
+    }
+
+    [Fact]
+    public async Task Broadcast_AllExceptOneDoesNotReachExcluded()
+    {
+        await using var server1 = await CreateServerAsync();
+        await using var server2 = await CreateServerAsync();
+        await using var client1 = await server1.CreateClientAsync();
+        await using var client2 = await server2.CreateClientAsync();
+        await using var excluded = await server2.CreateClientAsync();
+
+        var m1 = client1.ExpectMessageAsync(nameof(IClient.Receive));
+        var m2 = client2.ExpectMessageAsync(nameof(IClient.Receive));
+
+        var excludedId = await excluded.Send.GetConnectionId();
+
+        await client1.Send.SendToAllExcept("nope", excludedId);
+
+        Assert.Equal("nope", (await m1).Arg<string>(0));
+        Assert.Equal("nope", (await m2).Arg<string>(0));
+        await excluded.EnsureNoMessageAsync(nameof(IClient.Receive));
     }
 
     [Fact]

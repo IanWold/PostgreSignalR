@@ -1,0 +1,7 @@
+# Exclude build outputs and transient logs from Docker build contexts
+**/bin/
+**/obj/
+**/Log/
+.vs/
+.vscode/
+.git/
