@@ -41,9 +41,6 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
     {
         connection.Register<IClient>(Receiver);
         _serverProxy = connection.CreateHubProxy<IServer>();
-
-        // connection.ClientRegistration<IClient>(Receiver);
-        // _serverProxy = connection.ServerProxy<IServer>();
         
         await connection.StartAsync();
     }
