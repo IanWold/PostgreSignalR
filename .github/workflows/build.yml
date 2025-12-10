@@ -19,4 +19,4 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Test
-      run: dotnet test PostgreSignalR.slnx --no-build --verbosity normal
+      run: dotnet test PostgreSignalR.slnx --no-build --verbosity normal -m:1
