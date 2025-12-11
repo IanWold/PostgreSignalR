@@ -17,7 +17,5 @@ public interface IServer
     Task SendToUsers(string[] userIds, string message);
     Task SendToAllExcept(string message, string excludedConnectionId);
     Task<string> EchoWithServerId(string message);
-    IAsyncEnumerable<string> StreamSequence(int count, string prefix);
     Task<string> InvokeConnectionEcho(string connectionId, string message);
-    Task SendStreamToConnection(string connectionId, int count, string prefix);
 }

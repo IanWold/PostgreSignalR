@@ -52,23 +52,6 @@ public class TestHub() : Hub<IClient>, IServer
     public Task<string> EchoWithServerId(string message) =>
         Task.FromResult($"{Environment.MachineName}:{Context.ConnectionId}:{message}");
 
-    public async IAsyncEnumerable<string> StreamSequence(int count, string prefix)
-    {
-        for (var i = 0; i < count; i++)
-        {
-            yield return $"{prefix}-{i}";
-            await Task.Delay(1);
-        }
-    }
-
     public async Task<string> InvokeConnectionEcho(string connectionId, string message) =>
         await Clients.Client(connectionId).EchoBack(message);
-
-    public async Task SendStreamToConnection(string connectionId, int count, string prefix)
-    {
-        for (var i = 0; i < count; i++)
-        {
-            await Clients.Client(connectionId).ReceiveStreamItem($"{prefix}-{i}");
-        }
-    }
 }
