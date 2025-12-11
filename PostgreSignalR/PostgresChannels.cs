@@ -4,26 +4,21 @@ namespace PostgreSignalR;
 
 internal sealed class PostgresChannels(string prefix, string returnServerName)
 {
-    private const int MaxIdentifierLength = 63;
+    private const int _maxIdentifierLength = 63;
 
     private static string Sanitize(string name)
     {
         // Postgres identifiers are limited to 63 bytes. If we exceed that, trim and add a hash suffix for uniqueness.
-        if (name.Length <= MaxIdentifierLength)
+        if (name.Length <= _maxIdentifierLength)
         {
             return name;
         }
 
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        var hash = Convert.ToHexString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(name))).ToLowerInvariant();
-        var suffix = "_" + hash[..8];
-        var trimLength = MaxIdentifierLength - suffix.Length;
-        if (trimLength < 0)
-        {
-            trimLength = 0;
-        }
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name))).ToLowerInvariant();
+        var suffix = $"_{hash[..8]}";
+        var trimLength = Math.Max(_maxIdentifierLength - suffix.Length, 0);
 
-        return name[..trimLength] + suffix;
+        return $"{name[..trimLength]}{suffix}";
     }
 
     private static string Normalize(string value) => Sanitize(value.Replace('-', '_'));
