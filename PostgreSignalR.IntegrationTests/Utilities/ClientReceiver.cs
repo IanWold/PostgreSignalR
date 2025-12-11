@@ -25,9 +25,6 @@ public class ClientReceiver(Func<string, object?[], Task> callback) : IClient
     public Task ReceiveUser(string message) =>
         callback(nameof(IClient.ReceiveUser), [message]);
 
-    public Task ReceiveStreamItem(string message) =>
-        callback(nameof(IClient.ReceiveStreamItem), [message]);
-
     public Task<string> EchoBack(string message) =>
         Task.FromResult($"echo:{message}");
 }
