@@ -1,9 +1,12 @@
 <div align="center">
-  <h1>PostgreSignalR</h1>
+  
+<img src="https://raw.githubusercontent.com/IanWold/PostgreSignalR/refs/heads/misc/logo/cowboylogo.png" height="75">
 
-  Experimental, in-dev Postgres backplane for SignalR
+# PostgreSignalR
 
-  <a href="https://www.nuget.org/packages/PostgreSignalR"><img alt="NuGet Version" src="https://img.shields.io/nuget/vpre/PostgreSignalR?style=for-the-badge&logo=nuget"></a>
+Experimental, in-dev Postgres backplane for SignalR
+
+<a href="https://www.nuget.org/packages/PostgreSignalR"><img alt="NuGet Version" src="https://img.shields.io/nuget/vpre/PostgreSignalR?style=for-the-badge&logo=nuget"></a>
 </div>
 
 ---
@@ -107,3 +110,4 @@ Development should typically progress through: discussion, triaging into one or 
 * 💡 **New Features or Ideas** should start by opening a discussion instead of an issue. If that conversation results in wanting to move forward with the idea, one or more issues will be created that can then be taken on.
 
 When in doubt: ask a question! If you feel more comfortable you can also feel free to [reach me directly](https://ian.wold.guru/connect.html) for anything.
+
