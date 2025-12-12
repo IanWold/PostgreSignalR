@@ -14,12 +14,12 @@ public class ConnectionTargetingTests(ContainerFixture fixture) : BaseTest(fixtu
         await using var bystander = await server2.CreateClientAsync();
 
         var targetId = await target.Send.GetConnectionId();
-        var recv = target.ExpectMessageAsync(nameof(IClient.ReceiveConnection));
+        var recv = target.ExpectMessageAsync(nameof(IClient.Message));
 
         await sender.Send.SendToConnection(targetId, "direct");
 
         Assert.Equal("direct", (await recv).Arg<string>(0));
-        await bystander.EnsureNoMessageAsync(nameof(IClient.ReceiveConnection));
+        await bystander.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
     [Fact]
@@ -34,8 +34,8 @@ public class ConnectionTargetingTests(ContainerFixture fixture) : BaseTest(fixtu
         var t1 = await target1.Send.GetConnectionId();
         var t2 = await target2.Send.GetConnectionId();
 
-        var r1 = target1.ExpectMessageAsync(nameof(IClient.ReceiveConnection));
-        var r2 = target2.ExpectMessageAsync(nameof(IClient.ReceiveConnection));
+        var r1 = target1.ExpectMessageAsync(nameof(IClient.Message));
+        var r2 = target2.ExpectMessageAsync(nameof(IClient.Message));
 
         await sender.Send.SendToConnections([t1, t2], "multi");
 

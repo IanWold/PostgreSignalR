@@ -16,14 +16,14 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
         await member1.Send.JoinGroup("alpha");
         await member2.Send.JoinGroup("alpha");
 
-        var m1 = member1.ExpectMessageAsync(nameof(IClient.ReceiveGroup));
-        var m2 = member2.ExpectMessageAsync(nameof(IClient.ReceiveGroup));
+        var m1 = member1.ExpectMessageAsync(nameof(IClient.Message));
+        var m2 = member2.ExpectMessageAsync(nameof(IClient.Message));
 
-        await member1.Send.SendToGroup("alpha", "group-msg");
+        await member1.Send.SendToAllInGroup("alpha", "group-msg");
 
         Assert.Equal("group-msg", (await m1).Arg<string>(0));
         Assert.Equal("group-msg", (await m2).Arg<string>(0));
-        await outsider.EnsureNoMessageAsync(nameof(IClient.ReceiveGroup));
+        await outsider.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
     [Fact]
@@ -38,11 +38,11 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
         await member2.Send.JoinGroup("beta");
         await member2.Send.LeaveGroup("beta");
 
-        var m1 = member1.ExpectMessageAsync(nameof(IClient.ReceiveGroup));
+        var m1 = member1.ExpectMessageAsync(nameof(IClient.Message));
 
-        await member1.Send.SendToGroup("beta", "after-remove");
+        await member1.Send.SendToAllInGroup("beta", "after-remove");
 
         Assert.Equal("after-remove", (await m1).Arg<string>(0));
-        await member2.EnsureNoMessageAsync(nameof(IClient.ReceiveGroup));
+        await member2.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }
