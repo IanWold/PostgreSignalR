@@ -25,7 +25,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
     private readonly PostgresChannels _channels;
     private readonly IHubProtocolResolver _hubProtocolResolver;
     private readonly ILogger<PostgresHubLifetimeManager<THub>> _logger;
-    private readonly PostgresOptions _options;
+    private readonly PostgresBackplaneOptions _options;
     private readonly string _serverName = GenerateServerName();
     private readonly PostgresProtocol _protocol;
     private readonly SemaphoreSlim _commandLock = new(1);
@@ -37,7 +37,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
 
     public PostgresHubLifetimeManager(
         ILogger<PostgresHubLifetimeManager<THub>> logger,
-        IOptions<PostgresOptions> options,
+        IOptions<PostgresBackplaneOptions> options,
         IHubProtocolResolver hubProtocolResolver,
         IOptions<HubOptions>? globalHubOptions,
         IOptions<HubOptions<THub>>? hubOptions
@@ -59,7 +59,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
             _protocol = new PostgresProtocol(hubProtocolResolver, supportedProtocols, null);
         }
 
-        _postgresListener = new(options.Value.ConnectionString);
+        _postgresListener = new(options.Value.DataSource);
         _postgresListener.OnNotification += OnNotification;
     }
 
@@ -336,8 +336,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
         await _commandLock.WaitAsync();
         try
         {
-            using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync();
+            using var connection = await _options.DataSource.OpenConnectionAsync();
 
             using var notifyCommand = new NpgsqlCommand($"NOTIFY {channel.EscapeQutoes()}, '{payload}';", connection);
             return await notifyCommand.ExecuteNonQueryAsync();

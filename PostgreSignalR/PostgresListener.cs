@@ -4,7 +4,7 @@ using System.Text;
 
 namespace PostgreSignalR;
 
-internal sealed class PostgresListener(string connectionString) : IAsyncDisposable
+internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisposable
 {
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -87,8 +87,7 @@ internal sealed class PostgresListener(string connectionString) : IAsyncDisposab
 
             _conn?.Dispose();
 
-            _conn = new NpgsqlConnection(connectionString);
-            await _conn.OpenAsync(ct);
+            _conn = await dataSource.OpenConnectionAsync(ct);
             
             _conn.Notification += (_, e) => OnNotification?.Invoke(this, e);
 
@@ -148,8 +147,7 @@ internal sealed class PostgresListener(string connectionString) : IAsyncDisposab
                 _conn.Dispose();
             }
 
-            _conn = new NpgsqlConnection(connectionString);
-            await _conn.OpenAsync(_cts.Token);
+            _conn = await dataSource.OpenConnectionAsync(_cts.Token);
             
             _conn.Notification += (_, e) => OnNotification?.Invoke(this, e);
 

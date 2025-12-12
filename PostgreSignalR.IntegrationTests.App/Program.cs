@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using Npgsql;
 using PostgreSignalR.IntegrationTests.App;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -10,7 +11,7 @@ var postgresConnectionString = builder.Configuration.GetConnectionString("Postgr
 
 var isBackplaneReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-builder.Services.AddSignalR().AddPostgresBackplane(postgresConnectionString, o => o.OnInitialized = () => isBackplaneReady.TrySetResult());
+builder.Services.AddSignalR().AddPostgresBackplane(new NpgsqlDataSourceBuilder(postgresConnectionString).Build(), o => o.OnInitialized = () => isBackplaneReady.TrySetResult());
 
 builder.Services.AddSingleton<IUserIdProvider, QueryStringUserIdProvider>();
 
