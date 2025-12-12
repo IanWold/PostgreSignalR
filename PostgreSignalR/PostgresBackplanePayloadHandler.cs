@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Timers;
 using Npgsql;
 
@@ -31,7 +30,6 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
     private readonly string _reqdQuery;
     private readonly string _cleanupQuery;
 
-    private readonly ConcurrentBag<(long id, DateTime created)> _ids = [];
     private readonly System.Timers.Timer _cleanupTimer = new();
 
     public AlwaysUseTablePayloadHandler(PostgresBackplaneOptions options)
@@ -39,7 +37,7 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
         _options = options;
         _tableName = options.PayloadTable.QualifiedTableName;
         _reqdQuery = $"SELECT payload FROM {_options.PayloadTable.QualifiedTableName} WHERE id = @id";
-        _cleanupQuery = $"DELETE FROM {_options.PayloadTable.QualifiedTableName} WHERE id IN @ids";
+        _cleanupQuery = $"DELETE FROM {_options.PayloadTable.QualifiedTableName} WHERE EXTRACT(EPOCH FROM (NOW() - created_at)) * 1000 > {_options.PayloadTable.AutomaticCleanupTtlMs}";
 
         if (options.PayloadTable.AutomaticCleanup)
         {
@@ -51,18 +49,8 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
 
     private void CleanupIds(object? sender, ElapsedEventArgs e)
     {
-        var ids = _ids.Where(i => (DateTime.UtcNow - i.created).Milliseconds > _options.PayloadTable.AutomaticCleanupTtlMs).Select(i => i.id).ToArray()!;
-
-        if (ids.Length == 0)
-        {
-            return;
-        }
-
         using var connection = _options.DataSource.OpenConnection();
         using var command = new NpgsqlCommand(_cleanupQuery, connection);
-
-        command.Parameters.Add(new("ids", ids));
-
         command.ExecuteNonQuery();
     }
 
@@ -74,12 +62,8 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
                 INSERT INTO {_tableName} (payload)
                 VALUES (@payload)
                 RETURNING id;
-            ),
-            notification AS (
-                SELECT pg_notify({channelName}, 'id:' || id)
-                FROM inserted
             )
-            SELECT id FROM inserted;
+            NOTIFY {channelName}, (SELECT 'id:' || id FROM inserted);
             """;
 
         using var connection = await _options.DataSource.OpenConnectionAsync(ct);
@@ -87,9 +71,7 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
 
         command.Parameters.Add(new("payload", message));
 
-        var id = (long)(await command.ExecuteScalarAsync(ct))!;
-
-        _ids.Add((id, DateTime.UtcNow));
+        await command.ExecuteScalarAsync(ct);
     }
 
     public byte[] ResolveNotificationPayload(NpgsqlNotificationEventArgs eventArgs)

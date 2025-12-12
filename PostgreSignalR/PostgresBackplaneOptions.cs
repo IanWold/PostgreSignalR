@@ -77,7 +77,7 @@ public class PostgresBackplaneOptions
         /// The minimum TTL of a payload record in the table in milliseconds.
         /// </summary>
         /// <value>
-        /// Default: <c>1000</c>
+        /// Default: <c>300000</c> (5 minutes)
         /// </value>
         public int AutomaticCleanupTtlMs { get; set; } = 1000;
 
@@ -85,9 +85,9 @@ public class PostgresBackplaneOptions
         /// The interval between cleanups in milliseconds.
         /// </summary>
         /// <value>
-        /// Default: <c>360000</c>
+        /// Default: <c>21600000</c> (6 hours)
         /// </value>
-        public int AutomaticCleanupIntervalMs { get; set; } = 360000;
+        public int AutomaticCleanupIntervalMs { get; set; } = 21600000;
 
         internal string QualifiedTableName =>
             $"{(SchemaName is not null ? $"\"{SchemaName}\"." : string.Empty)}\"{TableName}\"";
