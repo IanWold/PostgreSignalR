@@ -53,12 +53,10 @@ public static class DependencyInjectionExtensions
     /// <param name="ct">The optional <see cref="CancellationToken"/>.</param>
     public static async Task InitializePostgresBackplanePayloadTableAsync(this IApplicationBuilder builder, CancellationToken ct = default)
     {
-        var config = builder.ApplicationServices.GetRequiredService<IOptions<PostgresBackplaneOptions>>().Value;
-
-        var schemaName = config.PayloadTable.SchemaName is not null ? $"\"{config.PayloadTable.SchemaName}\"." : string.Empty;
-        var tableName = $"{schemaName}\"{config.PayloadTable.TableName}\"";
-
-        await using var connection = await config.DataSource.OpenConnectionAsync(ct);
+        var options = builder.ApplicationServices.GetRequiredService<IOptions<PostgresBackplaneOptions>>().Value;
+        var tableName = options.PayloadTable.QualifiedTableName;
+        
+        await using var connection = await options.DataSource.OpenConnectionAsync(ct);
 
         var createQuery = $"""
             CREATE TABLE IF NOT EXISTS {tableName}

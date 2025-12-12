@@ -9,11 +9,11 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly HashSet<string> _channels = new(StringComparer.Ordinal);
-    private readonly ConcurrentQueue<Func<NpgsqlConnection, CancellationToken, Task>> _ops = new();
+    private readonly ConcurrentQueue<Func<NpgsqlConnection, CancellationToken, Task>> _operations = new();
 
     private CancellationTokenSource _waitCts = new();
     private Task? _pumpTask;
-    private NpgsqlConnection? _conn;
+    private NpgsqlConnection? _connection;
 
     public event EventHandler<NpgsqlNotificationEventArgs>? OnNotification;
 
@@ -21,14 +21,14 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
     {
         while (!_cts.IsCancellationRequested)
         {
-            if (_conn is not NpgsqlConnection conn)
+            if (_connection is not NpgsqlConnection connection)
             {
                 return;
             }
 
             try
             {
-                await conn.WaitAsync(_waitCts.Token);
+                await connection.WaitAsync(_waitCts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -44,11 +44,11 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
                     _waitCts.Dispose();
                     _waitCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
 
-                    while (_ops.TryDequeue(out var op))
+                    while (_operations.TryDequeue(out var operation))
                     {
                         try
                         {
-                            await op(conn, _cts.Token);
+                            await operation(connection, _cts.Token);
                         }
                         catch
                         {
@@ -78,18 +78,18 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
         {
             try
             {
-                if (_conn is not null)
+                if (_connection is not null)
                 {
-                    await _conn.CloseAsync();
+                    await _connection.CloseAsync();
                 }
             }
             catch { }
 
-            _conn?.Dispose();
+            _connection?.Dispose();
 
-            _conn = await dataSource.OpenConnectionAsync(ct);
+            _connection = await dataSource.OpenConnectionAsync(ct);
             
-            _conn.Notification += (_, e) => OnNotification?.Invoke(this, e);
+            _connection.Notification += (_, e) => OnNotification?.Invoke(this, e);
 
             if (_channels.Count > 0)
             {
@@ -117,7 +117,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
 
     private async Task ExecAsync(string sql, CancellationToken ct, NpgsqlConnection? connOverride = null)
     {
-        await using var cmd = new NpgsqlCommand(sql, connOverride ?? _conn ?? throw new InvalidOperationException("Connection not open."));
+        await using var cmd = new NpgsqlCommand(sql, connOverride ?? _connection ?? throw new InvalidOperationException("Connection not open."));
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
@@ -131,25 +131,25 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
         await _gate.WaitAsync(_cts.Token);
         try
         {
-            if (_conn is not null && _conn.FullState == System.Data.ConnectionState.Open && _pumpTask is { IsCompleted: false })
+            if (_connection is not null && _connection.FullState == System.Data.ConnectionState.Open && _pumpTask is { IsCompleted: false })
             {
                 return;
             }
 
-            if (_conn is not null)
+            if (_connection is not null)
             {
                 try
                 {
-                    await _conn.CloseAsync();
+                    await _connection.CloseAsync();
                 }
                 catch { }
 
-                _conn.Dispose();
+                _connection.Dispose();
             }
 
-            _conn = await dataSource.OpenConnectionAsync(_cts.Token);
+            _connection = await dataSource.OpenConnectionAsync(_cts.Token);
             
-            _conn.Notification += (_, e) => OnNotification?.Invoke(this, e);
+            _connection.Notification += (_, e) => OnNotification?.Invoke(this, e);
 
             if (_channels.Count > 0)
             {
@@ -178,7 +178,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
                 return;
             }
 
-            _ops.Enqueue(async (conn, tok) =>
+            _operations.Enqueue(async (conn, tok) =>
             {
                 await ExecAsync($"LISTEN {channel.EscapeQutoes()};", tok, conn);
             });
@@ -203,7 +203,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
                 return;
             }
 
-            _ops.Enqueue(async (conn, tok) =>
+            _operations.Enqueue(async (conn, tok) =>
             {
                 await ExecAsync($"UNLISTEN {channel.EscapeQutoes()};", tok, conn);
             });
@@ -229,7 +229,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
 
             _channels.Clear();
 
-            _ops.Enqueue(async (conn, tok) =>
+            _operations.Enqueue(async (conn, tok) =>
             {
                 await ExecAsync("UNLISTEN *;", tok, conn);
             });
@@ -261,23 +261,23 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
         {
             try
             {
-                if (_conn is not null)
+                if (_connection is not null)
                 {
-                    await ExecAsync("UNLISTEN *;", CancellationToken.None, _conn);
+                    await ExecAsync("UNLISTEN *;", CancellationToken.None, _connection);
                 }
             }
             catch { }
 
             try
             {
-                if (_conn is not null)
+                if (_connection is not null)
                 {
-                    await _conn.CloseAsync();
+                    await _connection.CloseAsync();
                 }
             }
             catch { }
 
-            _conn?.Dispose();
+            _connection?.Dispose();
             _waitCts.Dispose();
         }
         finally

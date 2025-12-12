@@ -88,6 +88,9 @@ public class PostgresBackplaneOptions
         /// Default: <c>360000</c>
         /// </value>
         public int AutomaticCleanupIntervalMs { get; set; } = 360000;
+
+        internal string QualifiedTableName =>
+            $"{(SchemaName is not null ? $"\"{SchemaName}\"." : string.Empty)}\"{TableName}\"";
     }
 
     /// <summary>
