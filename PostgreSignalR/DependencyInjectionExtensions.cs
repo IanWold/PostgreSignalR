@@ -49,9 +49,8 @@ public static class DependencyInjectionExtensions
     /// <summary>
     /// Initializes a standard payload table for the Postgres backplane.
     /// </summary>
-    /// <param name="builder"></param>
-    /// <param name="ct"></param>
-    /// <returns></returns>
+    /// <param name="builder">The <see cref="IApplicationBuilder"/>.</param>
+    /// <param name="ct">The optional <see cref="CancellationToken"/>.</param>
     public static async Task InitializePostgresBackplanePayloadTableAsync(this IApplicationBuilder builder, CancellationToken ct = default)
     {
         var config = builder.ApplicationServices.GetRequiredService<IOptions<PostgresBackplaneOptions>>().Value;
@@ -71,7 +70,7 @@ public static class DependencyInjectionExtensions
             CREATE INDEX ON {tableName} (created_at);
             """;
 
-        await using var createCommand = new NpgsqlCommand(createQuery, connection);
+        using var createCommand = new NpgsqlCommand(createQuery, connection);
         await createCommand.ExecuteNonQueryAsync(ct);
     }
 }
