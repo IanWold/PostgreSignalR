@@ -2,7 +2,7 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class UserTargetingTests(ContainerFixture fixture) : BaseTest(fixture)
+public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 {
     [Fact]
     public async Task Broadcast_AllServersReceive()

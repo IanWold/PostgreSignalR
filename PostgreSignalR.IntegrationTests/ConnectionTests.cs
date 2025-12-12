@@ -2,7 +2,7 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class ConnectionTargetingTests(ContainerFixture fixture) : BaseTest(fixture)
+public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
 {
     [Fact]
     public async Task Connection_TargetsSingleConnection()

@@ -6,7 +6,7 @@ using PostgreSignalR;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
-public static class DependencyInjectionExtensions
+public static class AspExtensions
 {
     /// <summary>
     /// Adds scale-out to a <see cref="ISignalRServerBuilder"/>, using a shared Postgres database.
@@ -15,9 +15,7 @@ public static class DependencyInjectionExtensions
     /// <param name="postgresConnectionString">The connection string used to connect to the Postgres database.</param>
     /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
     public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, NpgsqlDataSource dataSource) =>
-        AddPostgresBackplane(signalrBuilder, o =>
-            o.DataSource = dataSource
-        );
+        AddPostgresBackplane(signalrBuilder, o => o.DataSource = dataSource);
 
     /// <summary>
     /// Adds scale-out to a <see cref="ISignalRServerBuilder"/>, using a shared Postgres database.
@@ -27,7 +25,8 @@ public static class DependencyInjectionExtensions
     /// <param name="configure">A callback to configure the Postgres options.</param>
     /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
     public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, NpgsqlDataSource dataSource, Action<PostgresBackplaneOptions> configure) =>
-        AddPostgresBackplane(signalrBuilder, o => {
+        AddPostgresBackplane(signalrBuilder, o =>
+        {
             o.DataSource = dataSource;
             configure(o);
         });

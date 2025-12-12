@@ -7,6 +7,9 @@ public class BaseTest(ContainerFixture fixture) : IAsyncLifetime
     internal async Task<TestServer> CreateServerAsync() =>
         new(await fixture.CreateTestServerAsync(Database));
 
+    internal static string GenerateLargeString() =>
+        new('A', 10000);
+
     public async ValueTask InitializeAsync() =>
         Database = await fixture.GetDatabaseAsync();
 

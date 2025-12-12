@@ -36,8 +36,8 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
     {
         _options = options;
         _tableName = options.PayloadTable.QualifiedTableName;
-        _reqdQuery = $"SELECT payload FROM {_options.PayloadTable.QualifiedTableName} WHERE id = @id";
-        _cleanupQuery = $"DELETE FROM {_options.PayloadTable.QualifiedTableName} WHERE EXTRACT(EPOCH FROM (NOW() - created_at)) * 1000 > {_options.PayloadTable.AutomaticCleanupTtlMs}";
+        _reqdQuery = $"SELECT payload FROM {_options.PayloadTable.QualifiedTableName} WHERE id = @id;";
+        _cleanupQuery = $"DELETE FROM {_options.PayloadTable.QualifiedTableName} WHERE EXTRACT(EPOCH FROM (NOW() - created_at)) * 1000 > {_options.PayloadTable.AutomaticCleanupTtlMs};";
 
         if (options.PayloadTable.AutomaticCleanup)
         {
@@ -61,9 +61,11 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
             (
                 INSERT INTO {_tableName} (payload)
                 VALUES (@payload)
-                RETURNING id;
+                RETURNING id
             )
-            NOTIFY {channelName}, (SELECT 'id:' || id FROM inserted);
+
+            SELECT pg_notify('{channelName}', 'id:' || id)
+            FROM inserted;
             """;
 
         using var connection = await _options.DataSource.OpenConnectionAsync(ct);
@@ -76,12 +78,15 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
 
     public byte[] ResolveNotificationPayload(NpgsqlNotificationEventArgs eventArgs)
     {
-        var id = Convert.ToInt64(eventArgs.Payload[3..]);
-
         using var connection = _options.DataSource.OpenConnection();
         using var command = new NpgsqlCommand(_reqdQuery, connection);
 
-        var message = (byte[])command.ExecuteScalar()!;
+        command.Parameters.Add(new("id", Convert.ToInt64(eventArgs.Payload[3..])));
+
+        var reader = command.ExecuteReader();
+        reader.Read();
+
+        var message = (byte[])reader[0];
         return message;
     }
 }

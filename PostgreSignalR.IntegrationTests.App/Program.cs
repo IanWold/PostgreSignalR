@@ -11,11 +11,17 @@ var postgresConnectionString = builder.Configuration.GetConnectionString("Postgr
 
 var isBackplaneReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-builder.Services.AddSignalR().AddPostgresBackplane(new NpgsqlDataSourceBuilder(postgresConnectionString).Build(), o => o.OnInitialized = () => isBackplaneReady.TrySetResult());
+builder.Services.AddSignalR().AddPostgresBackplane(new NpgsqlDataSourceBuilder(postgresConnectionString).Build(), o =>
+{
+    o.OnInitialized = () => isBackplaneReady.TrySetResult();
+    o.PayloadStrategy = PostgreSignalR.PostgresBackplanePayloadStrategy.UseTableWhenLarge;
+});
 
 builder.Services.AddSingleton<IUserIdProvider, QueryStringUserIdProvider>();
 
 var app = builder.Build();
+
+await app.InitializePostgresBackplanePayloadTableAsync();
 
 app.UseRouting();
 app.MapHub<TestHub>("/hub");
