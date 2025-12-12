@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Timers;
 using Npgsql;
 
 namespace PostgreSignalR;
@@ -22,10 +24,47 @@ internal class AlwaysUseEventPayloadHandler(PostgresBackplaneOptions options) : 
         Convert.FromBase64String(eventArgs.Payload);
 }
 
-internal class AlwaysUseTablePayloadHandler(PostgresBackplaneOptions options) : IPostgresBackplanePayloadHandler
+internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
 {
-    private readonly string _tableName = options.PayloadTable.QualifiedTableName;
-    private readonly string _reqdQuery = $"SELECT payload FROM {options.PayloadTable.QualifiedTableName} WHERE id = @id";
+    private readonly PostgresBackplaneOptions _options;
+    private readonly string _tableName;
+    private readonly string _reqdQuery;
+    private readonly string _cleanupQuery;
+
+    private readonly ConcurrentBag<(long id, DateTime created)> _ids = [];
+    private readonly System.Timers.Timer _cleanupTimer = new();
+
+    public AlwaysUseTablePayloadHandler(PostgresBackplaneOptions options)
+    {
+        _options = options;
+        _tableName = options.PayloadTable.QualifiedTableName;
+        _reqdQuery = $"SELECT payload FROM {_options.PayloadTable.QualifiedTableName} WHERE id = @id";
+        _cleanupQuery = $"DELETE FROM {_options.PayloadTable.QualifiedTableName} WHERE id IN @ids";
+
+        if (options.PayloadTable.AutomaticCleanup)
+        {
+            _cleanupTimer.Elapsed += CleanupIds;
+            _cleanupTimer.Interval = options.PayloadTable.AutomaticCleanupIntervalMs;
+            _cleanupTimer.Start();
+        }
+    }
+
+    private void CleanupIds(object? sender, ElapsedEventArgs e)
+    {
+        var ids = _ids.Where(i => (DateTime.UtcNow - i.created).Milliseconds > _options.PayloadTable.AutomaticCleanupTtlMs).Select(i => i.id).ToArray()!;
+
+        if (ids.Length == 0)
+        {
+            return;
+        }
+
+        using var connection = _options.DataSource.OpenConnection();
+        using var command = new NpgsqlCommand(_cleanupQuery, connection);
+
+        command.Parameters.Add(new("ids", ids));
+
+        command.ExecuteNonQuery();
+    }
 
     public async Task NotifyAsync(string channelName, byte[] message, CancellationToken ct = default)
     {
@@ -35,23 +74,29 @@ internal class AlwaysUseTablePayloadHandler(PostgresBackplaneOptions options) : 
                 INSERT INTO {_tableName} (payload)
                 VALUES (@payload)
                 RETURNING id;
+            ),
+            notification AS (
+                SELECT pg_notify({channelName}, 'id:' || id)
+                FROM inserted
             )
-            NOTIFY {channelName}, (SELECT 'id:' || id FROM inserted);
+            SELECT id FROM inserted;
             """;
 
-        using var connection = await options.DataSource.OpenConnectionAsync(ct);
+        using var connection = await _options.DataSource.OpenConnectionAsync(ct);
         using var command = new NpgsqlCommand(query, connection);
 
         command.Parameters.Add(new("payload", message));
 
-        await command.ExecuteNonQueryAsync(ct);
+        var id = (long)(await command.ExecuteScalarAsync(ct))!;
+
+        _ids.Add((id, DateTime.UtcNow));
     }
 
     public byte[] ResolveNotificationPayload(NpgsqlNotificationEventArgs eventArgs)
     {
-        var id = Convert.ToInt32(eventArgs.Payload[3..]);
+        var id = Convert.ToInt64(eventArgs.Payload[3..]);
 
-        using var connection = options.DataSource.OpenConnection();
+        using var connection = _options.DataSource.OpenConnection();
         using var command = new NpgsqlCommand(_reqdQuery, connection);
 
         var message = (byte[])command.ExecuteScalar()!;
