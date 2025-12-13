@@ -54,20 +54,6 @@ public static class AspExtensions
     {
         var options = builder.ApplicationServices.GetRequiredService<IOptions<PostgresBackplaneOptions>>().Value;
         var tableName = options.PayloadTable.QualifiedTableName;
-        
-        await using var connection = await options.DataSource.OpenConnectionAsync(ct);
-
-        var createQuery = $"""
-            CREATE TABLE IF NOT EXISTS {tableName}
-            (
-                id BIGSERIAL PRIMARY KEY,
-                payload BYTEA NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-            );
-            CREATE INDEX ON {tableName} (created_at);
-            """;
-
-        using var createCommand = new NpgsqlCommand(createQuery, connection);
-        await createCommand.ExecuteNonQueryAsync(ct);
+        await PostgresPayloadTableHelper.CreateTableAsync(tableName, options.DataSource, ct);
     }
 }

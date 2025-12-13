@@ -38,5 +38,4 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Equal("multi", (await r1).Arg<string>(0));
         Assert.Equal("multi", (await r2).Arg<string>(0));
     }
-
 }
