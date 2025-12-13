@@ -16,7 +16,7 @@ file class PostgresFeature
     public HashSet<string> Groups { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
 
-public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDisposable where THub : Hub
+public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDisposable where THub : Hub
 {
     private readonly HubConnectionStore _connections = new();
     private readonly PostgresSubscriptionManager _groups = new();
@@ -32,16 +32,17 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
     private readonly ConcurrentDictionary<string, Action<byte[]>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ClientResultsManager _clientResultsManager = new();
     private readonly PostgresListener _postgresListener;
-    private readonly IPostgresBackplanePayloadHandler _payloadHandler;
+    private readonly IPostgresBackplanePayloadStrategy _payloadStrategy;
     private int _internalAckId;
     private bool _isInitialized;
 
     public PostgresHubLifetimeManager(
-        ILogger<PostgresHubLifetimeManager<THub>> logger,
-        IOptions<PostgresBackplaneOptions> options,
+        IPostgresBackplanePayloadStrategy payloadStrategy,
         IHubProtocolResolver hubProtocolResolver,
+        IOptions<PostgresBackplaneOptions> options,
         IOptions<HubOptions>? globalHubOptions,
-        IOptions<HubOptions<THub>>? hubOptions
+        IOptions<HubOptions<THub>>? hubOptions,
+        ILogger<PostgresHubLifetimeManager<THub>> logger
     )
     {
         _hubProtocolResolver = hubProtocolResolver;
@@ -60,12 +61,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
             _protocol = new PostgresProtocol(hubProtocolResolver, supportedProtocols, null);
         }
 
-        _payloadHandler = _options.PayloadStrategy switch
-        {
-            PostgresBackplanePayloadStrategy.AlwaysUseTable => new AlwaysUseTablePayloadHandler(_options),
-            PostgresBackplanePayloadStrategy.UseTableWhenLarge => new UseTableWhenLargePayloadHandler(_options),
-            _ => new AlwaysUseEventPayloadHandler(_options)
-        };
+        _payloadStrategy = payloadStrategy;
 
         _postgresListener = new(options.Value.DataSource);
         _postgresListener.OnNotification += OnNotification;
@@ -342,7 +338,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
         await _commandLock.WaitAsync();
         try
         {
-            await _payloadHandler.NotifyAsync(channel, message);
+            await _payloadStrategy.NotifyAsync(channel, message);
         }
         catch (Exception ex)
         {
@@ -765,7 +761,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
         _logger.BackplaneReadNotification(e.Channel);
         if (_notificationHandlers.TryGetValue(e.Channel, out var handler))
         {
-            handler(_payloadHandler.ResolveNotificationPayload(e));
+            handler(_payloadStrategy.ResolveNotificationPayload(e));
         }
     }
 

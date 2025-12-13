@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using PostgreSignalR;
 
@@ -40,8 +40,33 @@ public static class AspExtensions
     public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, Action<PostgresBackplaneOptions> configure)
     {
         signalrBuilder.Services.Configure(configure);
+
+        signalrBuilder.Services.TryAddSingleton<IPostgresBackplanePayloadStrategy, EventPayloadStrategy>();
         signalrBuilder.Services.AddSingleton(typeof(HubLifetimeManager<>), typeof(PostgresHubLifetimeManager<>));
         
+        return signalrBuilder;
+    }
+
+    /// <summary>
+    /// Configures the Postgres backplane to store payloads in a table.
+    /// </summary>
+    /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
+    /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
+    public static ISignalRServerBuilder AddBackplaneTablePayloadStrategy(this ISignalRServerBuilder signalrBuilder) =>
+        signalrBuilder.AddBackplaneTablePayloadStrategy(o => { });
+
+    /// <summary>
+    /// Configures the Postgres backplane to store payloads in a table.
+    /// </summary>
+    /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
+    /// <param name="configure">A callback to configure the payload table options.</param>
+    /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
+    public static ISignalRServerBuilder AddBackplaneTablePayloadStrategy(this ISignalRServerBuilder signalrBuilder, Action<PostgresBackplanePayloadTableOptions> configure)
+    {
+        signalrBuilder.Services.Configure(configure);
+
+        signalrBuilder.Services.AddSingleton<IPostgresBackplanePayloadStrategy, TablePayloadStrategy>();
+
         return signalrBuilder;
     }
 
@@ -52,8 +77,7 @@ public static class AspExtensions
     /// <param name="ct">The optional <see cref="CancellationToken"/>.</param>
     public static async Task InitializePostgresBackplanePayloadTableAsync(this IApplicationBuilder builder, CancellationToken ct = default)
     {
-        var options = builder.ApplicationServices.GetRequiredService<IOptions<PostgresBackplaneOptions>>().Value;
-        var tableName = options.PayloadTable.QualifiedTableName;
-        await PostgresPayloadTableHelper.CreateTableAsync(tableName, options.DataSource, ct);
+        var strategy = builder.ApplicationServices.GetRequiredService<TablePayloadStrategy>();
+        await strategy.InitializeTableAsync(ct);
     }
 }

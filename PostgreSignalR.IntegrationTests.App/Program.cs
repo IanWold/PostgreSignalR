@@ -11,11 +11,12 @@ var postgresConnectionString = builder.Configuration.GetConnectionString("Postgr
 
 var isBackplaneReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-builder.Services.AddSignalR().AddPostgresBackplane(new NpgsqlDataSourceBuilder(postgresConnectionString).Build(), o =>
-{
-    o.OnInitialized += () => isBackplaneReady.TrySetResult();
-    o.PayloadStrategy = PostgreSignalR.PostgresBackplanePayloadStrategy.UseTableWhenLarge;
-});
+builder.Services.AddSignalR()
+    .AddPostgresBackplane(new NpgsqlDataSourceBuilder(postgresConnectionString).Build(), o =>
+    {
+        o.OnInitialized += () => isBackplaneReady.TrySetResult();
+    })
+    .AddBackplaneTablePayloadStrategy();
 
 builder.Services.AddSingleton<IUserIdProvider, QueryStringUserIdProvider>();
 
