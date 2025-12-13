@@ -86,12 +86,12 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
         {
             await _postgresListener.EnsureReadyAsync();
 
-            await Task.WhenAll([
-                SubscribeToAll(),
-                SubscribeToGroupManagementChannel(),
-                SubscribeToAckChannel(),
-                SubscribeToReturnResultsAsync()
-            ]);
+            // await Task.WhenAll([
+                await SubscribeToAll();
+                await SubscribeToGroupManagementChannel();
+                await SubscribeToAckChannel();
+                await SubscribeToReturnResultsAsync();
+            // ]);
 
             try
             {
@@ -342,7 +342,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
         await _commandLock.WaitAsync();
         try
         {
-            await _payloadHandler.NotifyAsync(channel.EscapeQutoes(), message);
+            await _payloadHandler.NotifyAsync(channel, message);
         }
         catch (Exception ex)
         {

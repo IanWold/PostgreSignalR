@@ -63,14 +63,11 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
         return client;
     }
 
-    private static Uri AddUser(Uri baseUri, string? user)
-    {
-        if (string.IsNullOrWhiteSpace(user)) return baseUri;
+    private static Uri AddUser(Uri baseUri, string? user) =>
+        !string.IsNullOrWhiteSpace(user)
+        ? new Uri($"{baseUri}{(string.IsNullOrEmpty(baseUri.Query) ? "?" : "&")}user={Uri.EscapeDataString(user)}")
+        : baseUri;
 
-        var sep = string.IsNullOrEmpty(baseUri.Query) ? "?" : "&";
-        return new Uri($"{baseUri}{sep}user={Uri.EscapeDataString(user)}");
-    }
-    
     public Task<ClientMessage> ExpectMessageAsync(string key, TimeSpan? timeout = null)
     {
         var waiter = new TaskCompletionSource<ClientMessage>(TaskCreationOptions.RunContinuationsAsynchronously);

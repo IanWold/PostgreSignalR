@@ -1,5 +1,6 @@
 using System.Timers;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace PostgreSignalR;
 
@@ -14,7 +15,7 @@ internal class AlwaysUseEventPayloadHandler(PostgresBackplaneOptions options) : 
     public async Task NotifyAsync(string channelName, byte[] message, CancellationToken ct = default)
     {
         using var connection = await options.DataSource.OpenConnectionAsync(ct);
-        using var command = new NpgsqlCommand($"NOTIFY {channelName}, '{Convert.ToBase64String(message)}';", connection);
+        using var command = new NpgsqlCommand($"NOTIFY {channelName.EscapeQutoes()}, '{Convert.ToBase64String(message)}';", connection);
 
         await command.ExecuteNonQueryAsync(ct);
     }
@@ -50,8 +51,11 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
     private void CleanupIds(object? sender, ElapsedEventArgs e)
     {
         using var connection = _options.DataSource.OpenConnection();
-        using var command = new NpgsqlCommand(_cleanupQuery, connection);
+        using var transaction = connection.BeginTransaction();
+        using var command = new NpgsqlCommand(_cleanupQuery, connection, transaction);
+
         command.ExecuteNonQuery();
+        transaction.Commit();
     }
 
     public async Task NotifyAsync(string channelName, byte[] message, CancellationToken ct = default)
@@ -64,16 +68,19 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
                 RETURNING id
             )
 
-            SELECT pg_notify('{channelName}', 'id:' || id)
+            SELECT pg_notify(@channelName, 'id:' || id::text)
             FROM inserted;
             """;
 
         using var connection = await _options.DataSource.OpenConnectionAsync(ct);
-        using var command = new NpgsqlCommand(query, connection);
+        using var transaction = await connection.BeginTransactionAsync(ct);
+        using var command = new NpgsqlCommand(query, connection, transaction);
 
-        command.Parameters.Add(new("payload", message));
+        command.Parameters.Add(new("payload", message) { NpgsqlDbType = NpgsqlDbType.Bytea });
+        command.Parameters.Add(new("channelName", channelName));
 
-        await command.ExecuteScalarAsync(ct);
+        await command.ExecuteNonQueryAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     public byte[] ResolveNotificationPayload(NpgsqlNotificationEventArgs eventArgs)
