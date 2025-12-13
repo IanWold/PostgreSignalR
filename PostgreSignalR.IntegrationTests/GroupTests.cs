@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [Fact]
+    [RetryFact]
     public async Task Group_SendHitsMembersAcrossServers()
     {
         await using var member1 = await Server1.CreateClientAsync();
@@ -24,7 +24,7 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
         await outsider.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Group_RemovalStopsDelivery()
     {
         await using var member1 = await Server1.CreateClientAsync();

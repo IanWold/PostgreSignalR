@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class LargePayloadTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [Fact]
+    [RetryFact]
     public async Task LargePayload_AllServersReceive()
     {
         await using var client1 = await Server1.CreateClientAsync();

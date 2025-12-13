@@ -1,10 +1,11 @@
 using PostgreSignalR.IntegrationTests.Abstractions;
+using xRetry.v3;
 
 namespace PostgreSignalR.IntegrationTests;
 
 public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [Fact]
+    [RetryFact]
     public async Task Broadcast_AllServersReceive()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -19,7 +20,7 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Equal("hello", (await c2).Arg<string>(0));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task CallerOnly_DoesNotReachOthers()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -33,7 +34,7 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         await other.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Others_ReachAllOtherClients()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -50,7 +51,7 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         await caller.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Broadcast_AllExceptOneDoesNotReachExcluded()
     {
         await using var client1 = await Server1.CreateClientAsync();

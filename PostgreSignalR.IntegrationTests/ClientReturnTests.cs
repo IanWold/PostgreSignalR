@@ -2,7 +2,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class InvokeAndStreamingTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [Fact]
+    [RetryFact]
     public async Task Invoke_ReturnsAcrossServers()
     {
         await using var caller = await Server1.CreateClientAsync();

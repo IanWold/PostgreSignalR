@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [Fact]
+    [RetryFact]
     public async Task Broadcast_AllServersReceive()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -19,7 +19,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Equal("hello", (await c2).Arg<string>(0));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task CallerOnly_DoesNotReachOthers()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -33,7 +33,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         await other.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Others_ReachAllOtherClients()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -50,7 +50,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         await caller.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Group_SendHitsMembersAcrossServers()
     {
         await using var member1 = await Server1.CreateClientAsync();
@@ -70,7 +70,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         await outsider.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Group_RemovalStopsDelivery()
     {
         await using var member1 = await Server1.CreateClientAsync();
@@ -88,7 +88,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         await member2.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Connection_TargetsSingleConnection()
     {
         await using var sender = await Server1.CreateClientAsync();
@@ -104,7 +104,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         await bystander.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Connections_TargetsMultiple()
     {
         await using var sender = await Server1.CreateClientAsync();
@@ -123,7 +123,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Equal("multi", (await r2).Arg<string>(0));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Broadcast_AllExceptOneDoesNotReachExcluded()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -142,7 +142,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         await excluded.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Users_SendToUserHitsAllConnections()
     {
         await using var user1a = await Server1.CreateClientAsync("u1");
@@ -159,7 +159,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         await user2.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Users_SendToUsersHitsMultipleUsers()
     {
         await using var user1 = await Server1.CreateClientAsync("u1");

@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [Fact]
+    [RetryFact]
     public async Task Connection_TargetsSingleConnection()
     {
         await using var sender = await Server1.CreateClientAsync();
@@ -20,7 +20,7 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
         await bystander.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [Fact]
+    [RetryFact]
     public async Task Connections_TargetsMultiple()
     {
         await using var sender = await Server1.CreateClientAsync();

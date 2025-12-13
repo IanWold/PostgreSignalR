@@ -57,7 +57,7 @@ Going forward, there is no requirement that this codebase conforms to the archit
 Being an inherently network-related product, integration tests provide the greatest source of confidence in the functionality of the backplane. [The integration test project](https://github.com/IanWold/PostgreSignalR/tree/main/PostgreSignalR.IntegrationTests) is set up well to be able to test various scenarios involving multiple servers and clients. These tests use [Testcontainers](https://dotnet.testcontainers.org/) to create a Postgres server with an individual Postgres database per-test. They also have a [standalone SignalR server](https://github.com/IanWold/PostgreSignalR/tree/main/PostgreSignalR.IntegrationTests.App) providing functionality to cover all of the SignalR use cases. The integration tests can create multiple, separate instances of this server on Docker, and for each server can create muliple, separate clients. This makes it easy to cover various scenarios:
 
 ```csharp
-[Fact]
+[RetryFact]
 public async Task Test()
 {
     await using var server1 = await CreateServerAsync();
