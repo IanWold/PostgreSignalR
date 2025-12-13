@@ -9,7 +9,7 @@ public class TestServer(TestServerContainer container) : IAsyncDisposable
         using var httpClient = new HttpClient();
         var isReady = false;
 
-        for (var i = 0; i < 120; i++)
+        for (var i = 0; i < 400; i++)
         {
             try
             {
