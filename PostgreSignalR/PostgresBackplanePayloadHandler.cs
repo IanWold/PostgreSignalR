@@ -77,7 +77,7 @@ internal class AlwaysUseTablePayloadHandler : IPostgresBackplanePayloadHandler
         using var command = new NpgsqlCommand(query, connection, transaction);
 
         command.Parameters.Add(new("payload", message) { NpgsqlDbType = NpgsqlDbType.Bytea });
-        command.Parameters.Add(new("channelName", channelName));
+        command.Parameters.Add(new("channelName", channelName.Replace("\"", "\"\"")));
 
         await command.ExecuteNonQueryAsync(ct);
         await transaction.CommitAsync(ct);
