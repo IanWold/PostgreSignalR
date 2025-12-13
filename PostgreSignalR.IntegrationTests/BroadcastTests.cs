@@ -1,5 +1,4 @@
 using PostgreSignalR.IntegrationTests.Abstractions;
-using xRetry.v3;
 
 namespace PostgreSignalR.IntegrationTests;
 
