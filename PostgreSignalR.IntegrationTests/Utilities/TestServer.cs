@@ -22,7 +22,7 @@ public class TestServer(TestServerContainer container) : IAsyncDisposable
             }
             catch { }
 
-            await Task.Delay(25);
+            await Task.Delay(50);
         }
 
         return isReady ? client : throw new TimeoutException($"Health check did not report ready.");

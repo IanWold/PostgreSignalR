@@ -18,22 +18,55 @@ Setting up the Postgres backplane for SingalR is very simple. If you've configur
 builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_string>");
 ```
 
-4. Optionally, you can configure options for the backplane:
+That is all you need to get up and going! PostgreSignalR aims to be very extensible though, so there are some extra options you might find useful.
+
+### Backplane Configuration
+
+You can configure options for the backplane. Options are [documented in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Options).
 
 ```csharp
-builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_string>", options =>
+var dataSource = new NpgsqlDataSourceBuilder("<your_postgres_connection_string>").Build();
+builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
 {
-    // Prefix is added to the channel names that PostgreSignalR publishes in Postgres
-    // If you are using one Postgres database for multiple SignalR apps, you should
-    // use a different prefix for each app.
     options.Prefix = "myapp";
-
-    // OnInitialized is called after the backplane has successfully connected to Postgres
-    // and subscribed to the common channels. The backplane will not connect to Postgres
-    // until it receives a connection, so this callback can potentially happen quite late.
-    options.OnInitialized = () => Console.WriteLine("Woohoo! It worked!");
 });
 ```
+
+### Payload Strategies
+
+By default, PostgreSignalR will send message payloads within the notification event payload in Postgres. Postgres limits the size of these payloads to 8kb. This limit is more than enough for most use cases, but PostgreSignalR does include a mechanism to handle payloads of any size by storing the payloads in a table and only passing references to that table in the notification event paylod.
+
+```csharp
+builder.Services.AddSignalR()
+    .AddPostgresBackplane(dataSource)
+    .AddBackplaneTablePayloadStrategy();
+```
+
+The payload table strategy comes with its own configuration options as well:
+
+```csharp
+builder.Services.AddSignalR()
+    .AddPostgresBackplane(dataSource)
+    .AddBackplaneTablePayloadStrategy(options =>
+    {
+        options.StorageMode = PostgresBackplanePayloadTableStorage.Always;
+    });
+```
+
+The payload table strategy allows you to create your own table in Postgres, but for ease-of-use it also includes a default table implementation which you can use:
+
+
+```csharp
+builder.Services.AddSignalR()
+    .AddPostgresBackplane(dataSource)
+    .AddBackplaneTablePayloadStrategy();
+
+var app = builder.Build();
+
+await app.InitializePostgresBackplanePayloadTableAsync();
+```
+
+For more advanced use cases, PostgreSignalR allows you to create a custom payload strategy.
 
 # Roadmap
 
@@ -65,7 +98,7 @@ Going forward, there is no requirement that this codebase conforms to the archit
 Being an inherently network-related product, integration tests provide the greatest source of confidence in the functionality of the backplane. [The integration test project](https://github.com/IanWold/PostgreSignalR/tree/main/PostgreSignalR.IntegrationTests) is set up well to be able to test various scenarios involving multiple servers and clients. These tests use [Testcontainers](https://dotnet.testcontainers.org/) to create a Postgres server with an individual Postgres database per-test. They also have a [standalone SignalR server](https://github.com/IanWold/PostgreSignalR/tree/main/PostgreSignalR.IntegrationTests.App) providing functionality to cover all of the SignalR use cases. The integration tests can create multiple, separate instances of this server on Docker, and for each server can create muliple, separate clients. This makes it easy to cover various scenarios:
 
 ```csharp
-[Fact]
+[RetryFact]
 public async Task Test()
 {
     await using var server1 = await CreateServerAsync();

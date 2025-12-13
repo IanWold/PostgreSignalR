@@ -1,1 +1,2 @@
-[assembly: CollectionBehavior(MaxParallelThreads = 4)]
+global using xRetry.v3;
+[assembly: CollectionBehavior(DisableTestParallelization = true)]

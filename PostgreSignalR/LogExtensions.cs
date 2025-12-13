@@ -115,4 +115,11 @@ internal static partial class LogExtensions
         Message = "Postgres backplane encountered error while parsing result; using protocol {Protocol}."
     )]
     public static partial void BackplaneErrorParsingResult(this ILogger logger, string protocol, Exception? exception = null);
+
+    [LoggerMessage(
+        EventId = 160,
+        Level = LogLevel.Warning,
+        Message = "Postgres backplane encountered error while handling OnInitialized event. Ignoring."
+    )]
+    public static partial void BackplaneErrorDuringOnInitialized(this ILogger logger, Exception ex);
 }

@@ -16,7 +16,7 @@ file class PostgresFeature
     public HashSet<string> Groups { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
 
-public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDisposable where THub : Hub
+public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDisposable where THub : Hub
 {
     private readonly HubConnectionStore _connections = new();
     private readonly PostgresSubscriptionManager _groups = new();
@@ -25,22 +25,24 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
     private readonly PostgresChannels _channels;
     private readonly IHubProtocolResolver _hubProtocolResolver;
     private readonly ILogger<PostgresHubLifetimeManager<THub>> _logger;
-    private readonly PostgresOptions _options;
+    private readonly PostgresBackplaneOptions _options;
     private readonly string _serverName = GenerateServerName();
     private readonly PostgresProtocol _protocol;
     private readonly SemaphoreSlim _commandLock = new(1);
     private readonly ConcurrentDictionary<string, Action<byte[]>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ClientResultsManager _clientResultsManager = new();
     private readonly PostgresListener _postgresListener;
+    private readonly IPostgresBackplanePayloadStrategy _payloadStrategy;
     private int _internalAckId;
     private bool _isInitialized;
 
     public PostgresHubLifetimeManager(
-        ILogger<PostgresHubLifetimeManager<THub>> logger,
-        IOptions<PostgresOptions> options,
+        IPostgresBackplanePayloadStrategy payloadStrategy,
         IHubProtocolResolver hubProtocolResolver,
+        IOptions<PostgresBackplaneOptions> options,
         IOptions<HubOptions>? globalHubOptions,
-        IOptions<HubOptions<THub>>? hubOptions
+        IOptions<HubOptions<THub>>? hubOptions,
+        ILogger<PostgresHubLifetimeManager<THub>> logger
     )
     {
         _hubProtocolResolver = hubProtocolResolver;
@@ -59,7 +61,9 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
             _protocol = new PostgresProtocol(hubProtocolResolver, supportedProtocols, null);
         }
 
-        _postgresListener = new(options.Value.ConnectionString);
+        _payloadStrategy = payloadStrategy;
+
+        _postgresListener = new(options.Value.DataSource);
         _postgresListener.OnNotification += OnNotification;
     }
 
@@ -77,21 +81,21 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
         try
         {
             await _postgresListener.EnsureReadyAsync();
-            await SubscribeToAll();
-            await SubscribeToGroupManagementChannel();
-            await SubscribeToAckChannel();
-            await SubscribeToReturnResultsAsync();
 
-            if (_options.OnInitialized is not null)
+            await Task.WhenAll([
+                SubscribeToAll(),
+                SubscribeToGroupManagementChannel(),
+                SubscribeToAckChannel(),
+                SubscribeToReturnResultsAsync()
+            ]);
+
+            try
             {
-                try
-                {
-                    _options.OnInitialized.Invoke();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Postgres backplane OnInitialized callback failed.");
-                }
+                _options.InvokeOnInitialized();
+            }
+            catch (Exception ex)
+            {
+                _logger.BackplaneErrorDuringOnInitialized(ex);
             }
 
             _logger.BackplaneInitialized();
@@ -327,20 +331,14 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
         }
     }
 
-    private async Task<long> PublishAsync(string channel, byte[] message)
+    private async Task PublishAsync(string channel, byte[] message)
     {
         _logger.BackplanePublishing(channel);
-
-        var payload = Convert.ToBase64String(message);
 
         await _commandLock.WaitAsync();
         try
         {
-            using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync();
-
-            using var notifyCommand = new NpgsqlCommand($"NOTIFY {channel.EscapeQutoes()}, '{payload}';", connection);
-            return await notifyCommand.ExecuteNonQueryAsync();
+            await _payloadStrategy.NotifyAsync(channel, message);
         }
         catch (Exception ex)
         {
@@ -763,7 +761,7 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
         _logger.BackplaneReadNotification(e.Channel);
         if (_notificationHandlers.TryGetValue(e.Channel, out var handler))
         {
-            handler(Convert.FromBase64String(e.Payload));
+            handler(_payloadStrategy.ResolveNotificationPayload(e));
         }
     }
 
