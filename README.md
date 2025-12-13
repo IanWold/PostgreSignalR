@@ -30,13 +30,14 @@ That is all you need to get up and going! PostgreSignalR aims to be very extensi
 
 ### Backplane Configuration
 
-You can configure options for the backplane. Options are [documented in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Options).
+You can configure options for the backplane. All of the options are presented blow and [documented in detail in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Options):
 
 ```csharp
 var dataSource = new NpgsqlDataSourceBuilder("<your_postgres_connection_string>").Build();
 builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
 {
     options.Prefix = "myapp";
+    options.OnInitialized += () => { /* Do something */ }
 });
 ```
 
@@ -50,14 +51,19 @@ builder.Services.AddSignalR()
     .AddBackplaneTablePayloadStrategy();
 ```
 
-The payload table strategy comes with its own configuration options as well:
+The payload table strategy comes with its own configuration options as well. All of the options are presented below and [documented in detail in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Options):
 
 ```csharp
 builder.Services.AddSignalR()
     .AddPostgresBackplane(dataSource)
     .AddBackplaneTablePayloadStrategy(options =>
     {
-        options.StorageMode = PostgresBackplanePayloadTableStorage.Always;
+        options.StorageMode = PostgresBackplanePayloadTableStorage.Auto;
+        options.SchemaName = "backplane";
+        options.TableName = "payloads";
+        options.AutomaticCleanup = true;
+        options.AutomaticCleanupTtlMs = 1000;
+        options.AutomaticCleanupIntervalMs = 3600000;
     });
 ```
 
