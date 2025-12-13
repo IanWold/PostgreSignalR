@@ -13,7 +13,7 @@ var isBackplaneReady = new TaskCompletionSource(TaskCreationOptions.RunContinuat
 
 builder.Services.AddSignalR().AddPostgresBackplane(new NpgsqlDataSourceBuilder(postgresConnectionString).Build(), o =>
 {
-    o.OnInitialized = () => isBackplaneReady.TrySetResult();
+    o.OnInitialized += () => isBackplaneReady.TrySetResult();
     o.PayloadStrategy = PostgreSignalR.PostgresBackplanePayloadStrategy.UseTableWhenLarge;
 });
 

@@ -85,21 +85,21 @@ public class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDispo
         try
         {
             await _postgresListener.EnsureReadyAsync();
-            await SubscribeToAll();
-            await SubscribeToGroupManagementChannel();
-            await SubscribeToAckChannel();
-            await SubscribeToReturnResultsAsync();
 
-            if (_options.OnInitialized is not null)
+            await Task.WhenAll([
+                SubscribeToAll(),
+                SubscribeToGroupManagementChannel(),
+                SubscribeToAckChannel(),
+                SubscribeToReturnResultsAsync()
+            ]);
+
+            try
             {
-                try
-                {
-                    _options.OnInitialized.Invoke();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Postgres backplane OnInitialized callback failed.");
-                }
+                _options.InvokeOnInitialized();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Postgres backplane OnInitialized callback failed.");
             }
 
             _logger.BackplaneInitialized();

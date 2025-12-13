@@ -3,6 +3,11 @@ using Npgsql;
 namespace PostgreSignalR;
 
 /// <summary>
+/// Handler for <see cref="PostgresBackplaneOptions.OnInitialized"/>
+/// </summary>
+public delegate void OnInitializedHandler();
+
+/// <summary>
 /// Strategies the Postgres backplane can use to send payloads for events.
 /// </summary>
 public enum PostgresBackplanePayloadStrategy
@@ -122,7 +127,7 @@ public class PostgresBackplaneOptions
     /// <value>
     /// Default: <c>null</c>
     /// </value>
-    public Action? OnInitialized { get; set; }
+    public event OnInitializedHandler? OnInitialized;
 
     /// <summary>
     /// Configures how payloads are sent in notifications.
@@ -148,4 +153,7 @@ public class PostgresBackplaneOptions
     /// When <see cref="PayloadStrategy"/> is <see cref="PostgresBackplanePayloadStrategy.AlwaysUseEvent"/> the table is not used.
     /// </remarks>
     public PayloadTableOptions PayloadTable { get; set; } = new();
+
+    internal void InvokeOnInitialized() =>
+        OnInitialized?.Invoke();
 }
