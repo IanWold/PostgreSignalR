@@ -153,6 +153,11 @@ public sealed class TablePayloadStrategy : IPostgresBackplanePayloadStrategy
         return message;
     }
 
+    /// <summary>
+    /// Creates a standard table in Postgres to store payloads.
+    /// </summary>
+    /// <param name="ct">THe <see cref="CancellationToken"/>.</param>
+    /// <returns>A <see cref="Task"/> representing the work.</returns>
     public async Task InitializeTableAsync(CancellationToken ct = default)
     {
         await using var connection = await _backplaneOptions.Value.DataSource.OpenConnectionAsync(ct);

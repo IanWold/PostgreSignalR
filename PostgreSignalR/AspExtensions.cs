@@ -41,7 +41,7 @@ public static class AspExtensions
     {
         signalrBuilder.Services.Configure(configure);
 
-        signalrBuilder.Services.TryAddSingleton<IPostgresBackplanePayloadStrategy, EventPayloadStrategy>();
+        signalrBuilder.Services.AddSingleton<IPostgresBackplanePayloadStrategy, EventPayloadStrategy>();
         signalrBuilder.Services.AddSingleton(typeof(HubLifetimeManager<>), typeof(PostgresHubLifetimeManager<>));
         
         return signalrBuilder;
@@ -77,7 +77,11 @@ public static class AspExtensions
     /// <param name="ct">The optional <see cref="CancellationToken"/>.</param>
     public static async Task InitializePostgresBackplanePayloadTableAsync(this IApplicationBuilder builder, CancellationToken ct = default)
     {
-        var strategy = builder.ApplicationServices.GetRequiredService<TablePayloadStrategy>();
-        await strategy.InitializeTableAsync(ct);
+        var strategy = builder.ApplicationServices.GetRequiredService<IPostgresBackplanePayloadStrategy>();
+
+        if (strategy is TablePayloadStrategy tableStrategy)
+        {
+            await tableStrategy.InitializeTableAsync(ct);
+        }
     }
 }
