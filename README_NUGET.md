@@ -18,20 +18,12 @@ Setting up the Postgres backplane for SingalR is very simple. If you've configur
 builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_string>");
 ```
 
-4. Optionally, you can configure options for the backplane:
+4. Optionally, you can configure options for the backplane. Options are [documented in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Options).
 
 ```csharp
 builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_string>", options =>
 {
-    // Prefix is added to the channel names that PostgreSignalR publishes in Postgres
-    // If you are using one Postgres database for multiple SignalR apps, you should
-    // use a different prefix for each app.
     options.Prefix = "myapp";
-
-    // OnInitialized is called after the backplane has successfully connected to Postgres
-    // and subscribed to the common channels. The backplane will not connect to Postgres
-    // until it receives a connection, so this callback can potentially happen quite late.
-    options.OnInitialized = () => Console.WriteLine("Woohoo! It worked!");
 });
 ```
 
