@@ -9,7 +9,7 @@ public class TestServer(TestServerContainer container) : IAsyncDisposable
         using var httpClient = new HttpClient();
         var isReady = false;
 
-        for (var i = 0; i < 400; i++)
+        for (var i = 0; i < 240; i++)
         {
             try
             {
@@ -22,7 +22,7 @@ public class TestServer(TestServerContainer container) : IAsyncDisposable
             }
             catch { }
 
-            await Task.Delay(25);
+            await Task.Delay(50);
         }
 
         return isReady ? client : throw new TimeoutException($"Health check did not report ready.");

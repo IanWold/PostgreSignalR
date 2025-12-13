@@ -1,1 +1,1 @@
-[assembly: CollectionBehavior(MaxParallelThreads = 3)]
+[assembly: CollectionBehavior(MaxParallelThreads = 2)]
