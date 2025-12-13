@@ -7,11 +7,9 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
     [Fact]
     public async Task Connection_TargetsSingleConnection()
     {
-        await using var server1 = await CreateServerAsync();
-        await using var server2 = await CreateServerAsync();
-        await using var sender = await server1.CreateClientAsync();
-        await using var target = await server2.CreateClientAsync();
-        await using var bystander = await server2.CreateClientAsync();
+        await using var sender = await Server1.CreateClientAsync();
+        await using var target = await Server2.CreateClientAsync();
+        await using var bystander = await Server2.CreateClientAsync();
 
         var targetId = await target.Send.GetConnectionId();
         var recv = target.ExpectMessageAsync(nameof(IClient.Message));
@@ -25,11 +23,9 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
     [Fact]
     public async Task Connections_TargetsMultiple()
     {
-        await using var server1 = await CreateServerAsync();
-        await using var server2 = await CreateServerAsync();
-        await using var sender = await server1.CreateClientAsync();
-        await using var target1 = await server2.CreateClientAsync();
-        await using var target2 = await server1.CreateClientAsync();
+        await using var sender = await Server1.CreateClientAsync();
+        await using var target1 = await Server2.CreateClientAsync();
+        await using var target2 = await Server1.CreateClientAsync();
 
         var t1 = await target1.Send.GetConnectionId();
         var t2 = await target2.Send.GetConnectionId();

@@ -7,11 +7,9 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
     [Fact]
     public async Task Group_SendHitsMembersAcrossServers()
     {
-        await using var server1 = await CreateServerAsync();
-        await using var server2 = await CreateServerAsync();
-        await using var member1 = await server1.CreateClientAsync();
-        await using var member2 = await server2.CreateClientAsync();
-        await using var outsider = await server2.CreateClientAsync();
+        await using var member1 = await Server1.CreateClientAsync();
+        await using var member2 = await Server2.CreateClientAsync();
+        await using var outsider = await Server2.CreateClientAsync();
 
         await member1.Send.JoinGroup("alpha");
         await member2.Send.JoinGroup("alpha");
@@ -29,10 +27,8 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
     [Fact]
     public async Task Group_RemovalStopsDelivery()
     {
-        await using var server1 = await CreateServerAsync();
-        await using var server2 = await CreateServerAsync();
-        await using var member1 = await server1.CreateClientAsync();
-        await using var member2 = await server2.CreateClientAsync();
+        await using var member1 = await Server1.CreateClientAsync();
+        await using var member2 = await Server2.CreateClientAsync();
 
         await member1.Send.JoinGroup("beta");
         await member2.Send.JoinGroup("beta");

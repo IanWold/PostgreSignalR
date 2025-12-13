@@ -7,10 +7,8 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
     [Fact]
     public async Task Broadcast_AllServersReceive()
     {
-        await using var server1 = await CreateServerAsync();
-        await using var server2 = await CreateServerAsync();
-        await using var client1 = await server1.CreateClientAsync();
-        await using var client2 = await server2.CreateClientAsync();
+        await using var client1 = await Server1.CreateClientAsync();
+        await using var client2 = await Server2.CreateClientAsync();
 
         var c1 = client1.ExpectMessageAsync(nameof(IClient.Message));
         var c2 = client2.ExpectMessageAsync(nameof(IClient.Message));
@@ -24,10 +22,8 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
     [Fact]
     public async Task CallerOnly_DoesNotReachOthers()
     {
-        await using var server1 = await CreateServerAsync();
-        await using var server2 = await CreateServerAsync();
-        await using var caller = await server1.CreateClientAsync();
-        await using var other = await server2.CreateClientAsync();
+        await using var caller = await Server1.CreateClientAsync();
+        await using var other = await Server2.CreateClientAsync();
 
         var callerMsg = caller.ExpectMessageAsync(nameof(IClient.Message));
 
@@ -40,11 +36,9 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
     [Fact]
     public async Task Others_ReachAllOtherClients()
     {
-        await using var server1 = await CreateServerAsync();
-        await using var server2 = await CreateServerAsync();
-        await using var caller = await server1.CreateClientAsync();
-        await using var other1 = await server1.CreateClientAsync();
-        await using var other2 = await server2.CreateClientAsync();
+        await using var caller = await Server1.CreateClientAsync();
+        await using var other1 = await Server1.CreateClientAsync();
+        await using var other2 = await Server2.CreateClientAsync();
 
         var o1 = other1.ExpectMessageAsync(nameof(IClient.Message));
         var o2 = other2.ExpectMessageAsync(nameof(IClient.Message));
@@ -59,11 +53,9 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
     [Fact]
     public async Task Broadcast_AllExceptOneDoesNotReachExcluded()
     {
-        await using var server1 = await CreateServerAsync();
-        await using var server2 = await CreateServerAsync();
-        await using var client1 = await server1.CreateClientAsync();
-        await using var client2 = await server2.CreateClientAsync();
-        await using var excluded = await server2.CreateClientAsync();
+        await using var client1 = await Server1.CreateClientAsync();
+        await using var client2 = await Server2.CreateClientAsync();
+        await using var excluded = await Server2.CreateClientAsync();
 
         var m1 = client1.ExpectMessageAsync(nameof(IClient.Message));
         var m2 = client2.ExpectMessageAsync(nameof(IClient.Message));
