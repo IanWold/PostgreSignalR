@@ -26,14 +26,55 @@ Setting up the Postgres backplane for SingalR is very simple. If you've configur
 builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_string>");
 ```
 
-4. Optionally, you can configure options for the backplane. Options are [documented in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Options).
+That is all you need to get up and going! PostgreSignalR aims to be very extensible though, so there are some extra options you might find useful.
+
+### Backplane Configuration
+
+You can configure options for the backplane. Options are [documented in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Options).
 
 ```csharp
-builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_string>", options =>
+var dataSource = new NpgsqlDataSourceBuilder("<your_postgres_connection_string>").Build();
+builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
 {
     options.Prefix = "myapp";
 });
 ```
+
+### Payload Strategies
+
+By default, PostgreSignalR will send message payloads within the notification event payload in Postgres. Postgres limits the size of these payloads to 8kb. This limit is more than enough for most use cases, but PostgreSignalR does include a mechanism to handle payloads of any size by storing the payloads in a table and only passing references to that table in the notification event paylod.
+
+```csharp
+builder.Services.AddSignalR()
+    .AddPostgresBackplane(dataSource)
+    .AddBackplaneTablePayloadStrategy();
+```
+
+The payload table strategy comes with its own configuration options as well:
+
+```csharp
+builder.Services.AddSignalR()
+    .AddPostgresBackplane(dataSource)
+    .AddBackplaneTablePayloadStrategy(options =>
+    {
+        options.StorageMode = PostgresBackplanePayloadTableStorage.Always;
+    });
+```
+
+The payload table strategy allows you to create your own table in Postgres, but for ease-of-use it also includes a default table implementation which you can use:
+
+
+```csharp
+builder.Services.AddSignalR()
+    .AddPostgresBackplane(dataSource)
+    .AddBackplaneTablePayloadStrategy();
+
+var app = builder.Build();
+
+await app.InitializePostgresBackplanePayloadTableAsync();
+```
+
+For more advanced use cases, PostgreSignalR allows you to create a custom payload strategy.
 
 # Roadmap
 
