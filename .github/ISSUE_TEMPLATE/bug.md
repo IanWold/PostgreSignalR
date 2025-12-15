@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-Read first: Please fill out each section below, delete the sample text under each section, and delete this opening paragraph as well. Doing so signifies to me that you have read all of these instructions, which is important to me so that I can understand what your issue is and help you with it. Issues will be prioritized based on whether they have enough information for me to work on them and what the significance of the impact on you is.
+Read first: Thank you for reporting a bug, you're helping to improve this library for everyone! Please fill out each section below, delete the sample text under each section, and delete this opening paragraph as well. Doing so signifies to me that you have read all of these instructions, which is important to me so that I can fully understand what the issue is and resolve it efficiently.
 
 **Describe the bug**
 A clear and concise description of what the bug is. Below you will fill out technical details and impact statement, here just provide a top-level overview.
