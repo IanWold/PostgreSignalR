@@ -13,11 +13,11 @@ public class LargePayloadTests(ContainerFixture fixture) : BaseTest(fixture)
         var c1 = client1.ExpectMessageAsync(nameof(IClient.Message));
         var c2 = client2.ExpectMessageAsync(nameof(IClient.Message));
 
-        var largePayload = new string('A', 10000);
+        var message = new string('A', 10000);
 
-        await client1.Send.SendToAll(largePayload);
+        await client1.Send.SendToAll(message);
 
-        Assert.Equal(largePayload, (await c1).Arg<string>(0));
-        Assert.Equal(largePayload, (await c2).Arg<string>(0));
+        Assert.Equal(message, (await c1).Arg<string>(0));
+        Assert.Equal(message, (await c2).Arg<string>(0));
     }
 }

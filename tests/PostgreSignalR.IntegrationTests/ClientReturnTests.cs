@@ -9,7 +9,10 @@ public class InvokeAndStreamingTests(ContainerFixture fixture) : BaseTest(fixtur
         await using var callee = await Server2.CreateClientAsync();
 
         var calleeId = await callee.Send.GetConnectionId();
-        var result = await caller.Send.InvokeConnectionEcho(calleeId, "payload");
-        Assert.Equal("echo:payload", result);
+        
+        var message = Guid.NewGuid().ToString();
+        var result = await caller.Send.InvokeConnectionEcho(calleeId, message);
+
+        Assert.Equal($"echo:{message}", result);
     }
 }
