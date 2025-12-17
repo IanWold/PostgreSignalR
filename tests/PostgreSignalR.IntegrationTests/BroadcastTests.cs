@@ -10,14 +10,13 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         await using var client1 = await Server1.CreateClientAsync();
         await using var client2 = await Server2.CreateClientAsync();
 
-        var c1 = client1.ExpectMessageAsync(nameof(IClient.Message));
-        var c2 = client2.ExpectMessageAsync(nameof(IClient.Message));
+        var messageFromClient1 = client1.ExpectMessageAsync(nameof(IClient.Message));
+        var messageFromClient2 = client2.ExpectMessageAsync(nameof(IClient.Message));
 
-        var message = Guid.NewGuid().ToString();
-        await client1.Send.SendToAll(message);
+        await client1.Send.SendToAll(ShortMessage);
 
-        Assert.Equal(message, (await c1).Arg<string>(0));
-        Assert.Equal(message, (await c2).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromClient1).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromClient2).Arg<string>(0));
     }
 
     [RetryFact]
@@ -26,12 +25,11 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         await using var caller = await Server1.CreateClientAsync();
         await using var other = await Server2.CreateClientAsync();
 
-        var callerMsg = caller.ExpectMessageAsync(nameof(IClient.Message));
+        var messageFromCaller = caller.ExpectMessageAsync(nameof(IClient.Message));
 
-        var message = Guid.NewGuid().ToString();
-        await caller.Send.SendToCaller(message);
+        await caller.Send.SendToCaller(ShortMessage);
 
-        Assert.Equal(message, (await callerMsg).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromCaller).Arg<string>(0));
         await other.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -42,14 +40,13 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         await using var other1 = await Server1.CreateClientAsync();
         await using var other2 = await Server2.CreateClientAsync();
 
-        var o1 = other1.ExpectMessageAsync(nameof(IClient.Message));
-        var o2 = other2.ExpectMessageAsync(nameof(IClient.Message));
+        var messageFromOther1 = other1.ExpectMessageAsync(nameof(IClient.Message));
+        var messageFromOther2 = other2.ExpectMessageAsync(nameof(IClient.Message));
 
-        var message = Guid.NewGuid().ToString();
-        await caller.Send.SendToOthers(message);
+        await caller.Send.SendToOthers(ShortMessage);
 
-        Assert.Equal(message, (await o1).Arg<string>(0));
-        Assert.Equal(message, (await o2).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromOther1).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromOther2).Arg<string>(0));
 
         await caller.EnsureNoMessageAsync(nameof(IClient.Message));
     }
@@ -61,16 +58,16 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         await using var client2 = await Server2.CreateClientAsync();
         await using var excluded = await Server2.CreateClientAsync();
 
-        var m1 = client1.ExpectMessageAsync(nameof(IClient.Message));
-        var m2 = client2.ExpectMessageAsync(nameof(IClient.Message));
+        var messageFromClient1 = client1.ExpectMessageAsync(nameof(IClient.Message));
+        var messageFromClient2 = client2.ExpectMessageAsync(nameof(IClient.Message));
 
         var excludedId = await excluded.Send.GetConnectionId();
 
-        var message = Guid.NewGuid().ToString();
-        await client1.Send.SendToAllExcept(message, excludedId);
+        await client1.Send.SendToAllExcept(ShortMessage, excludedId);
 
-        Assert.Equal(message, (await m1).Arg<string>(0));
-        Assert.Equal(message, (await m2).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromClient1).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromClient2).Arg<string>(0));
+
         await excluded.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }

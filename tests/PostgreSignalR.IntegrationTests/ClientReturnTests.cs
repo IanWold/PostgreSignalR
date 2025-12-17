@@ -10,9 +10,8 @@ public class InvokeAndStreamingTests(ContainerFixture fixture) : BaseTest(fixtur
 
         var calleeId = await callee.Send.GetConnectionId();
         
-        var message = Guid.NewGuid().ToString();
-        var result = await caller.Send.InvokeConnectionEcho(calleeId, message);
+        var result = await caller.Send.InvokeConnectionEcho(calleeId, ShortMessage);
 
-        Assert.Equal($"echo:{message}", result);
+        Assert.Equal($"echo:{ShortMessage}", result);
     }
 }
