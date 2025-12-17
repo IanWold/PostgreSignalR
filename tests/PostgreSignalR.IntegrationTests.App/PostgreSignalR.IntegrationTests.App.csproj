@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PostgreSignalR.IntegrationTests.Abstractions\PostgreSignalR.IntegrationTests.Abstractions.csproj" />
-    <ProjectReference Include="..\PostgreSignalR\PostgreSignalR.csproj" />
+    <ProjectReference Include="..\..\src\PostgreSignalR.csproj" />
   </ItemGroup>
 
 </Project>
