@@ -1,12 +1,12 @@
 # Build Stage
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /src
+WORKDIR /work
 
-COPY ./PostgreSignalR ./PostgreSignalR
-COPY ./PostgreSignalR.IntegrationTests.Abstractions ./PostgreSignalR.IntegrationTests.Abstractions
-COPY ./PostgreSignalR.IntegrationTests.App ./PostgreSignalR.IntegrationTests.App
+COPY ./src ./src
+COPY ./tests/PostgreSignalR.IntegrationTests.Abstractions ./tests/PostgreSignalR.IntegrationTests.Abstractions
+COPY ./tests/PostgreSignalR.IntegrationTests.App ./tests/PostgreSignalR.IntegrationTests.App
 
-WORKDIR /src/PostgreSignalR.IntegrationTests.App
+WORKDIR /work/tests/PostgreSignalR.IntegrationTests.App
 RUN dotnet publish -c Release -o /app/publish --framework net9.0 --no-cache
 
 # Runtime Stage
