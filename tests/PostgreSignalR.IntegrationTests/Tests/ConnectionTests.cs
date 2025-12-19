@@ -12,11 +12,13 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
         await using var bystander = await Server2.CreateClientAsync();
 
         var targetId = await target.Send.GetConnectionId();
-        var recv = target.ExpectMessageAsync(nameof(IClient.Message));
 
-        await sender.Send.SendToConnection(targetId, "direct");
+        var messageFromTarget = target.ExpectMessageAsync(nameof(IClient.Message));
 
-        Assert.Equal("direct", (await recv).Arg<string>(0));
+        await sender.Send.SendToConnection(targetId, ShortMessage);
+
+        Assert.Equal(ShortMessage, (await messageFromTarget).Arg<string>(0));
+
         await bystander.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -27,15 +29,15 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
         await using var target1 = await Server2.CreateClientAsync();
         await using var target2 = await Server1.CreateClientAsync();
 
-        var t1 = await target1.Send.GetConnectionId();
-        var t2 = await target2.Send.GetConnectionId();
+        var target1Id = await target1.Send.GetConnectionId();
+        var target2Id = await target2.Send.GetConnectionId();
 
-        var r1 = target1.ExpectMessageAsync(nameof(IClient.Message));
-        var r2 = target2.ExpectMessageAsync(nameof(IClient.Message));
+        var messageFromTarget1 = target1.ExpectMessageAsync(nameof(IClient.Message));
+        var messageFromTarget2 = target2.ExpectMessageAsync(nameof(IClient.Message));
 
-        await sender.Send.SendToConnections([t1, t2], "multi");
+        await sender.Send.SendToConnections([target1Id, target2Id], ShortMessage);
 
-        Assert.Equal("multi", (await r1).Arg<string>(0));
-        Assert.Equal("multi", (await r2).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromTarget1).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromTarget2).Arg<string>(0));
     }
 }
