@@ -8,11 +8,13 @@ internal sealed class AckHandler : IDisposable
     private readonly Timer _timer;
     private readonly long _ackThreshold = (long)TimeSpan.FromSeconds(30).TotalMilliseconds;
     private readonly TimeSpan _ackInterval = TimeSpan.FromSeconds(5);
+    
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
     private readonly object _lock = new {};
 #endif
+
     private bool _disposed;
 
     public AckHandler()
