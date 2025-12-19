@@ -17,7 +17,7 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await sender.Send.SendToConnection(targetId, ShortMessage);
 
-        Assert.Equal(ShortMessage, (await messageFromTarget).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromTarget).Arg<string>());
 
         await bystander.EnsureNoMessageAsync(nameof(IClient.Message));
     }
@@ -37,7 +37,7 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await sender.Send.SendToConnections([target1Id, target2Id], ShortMessage);
 
-        Assert.Equal(ShortMessage, (await messageFromTarget1).Arg<string>(0));
-        Assert.Equal(ShortMessage, (await messageFromTarget2).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromTarget1).Arg<string>());
+        Assert.Equal(ShortMessage, (await messageFromTarget2).Arg<string>());
     }
 }

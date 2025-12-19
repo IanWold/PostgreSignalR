@@ -15,8 +15,8 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await client1.Send.SendToAll("hello");
 
-        Assert.Equal("hello", (await c1).Arg<string>(0));
-        Assert.Equal("hello", (await c2).Arg<string>(0));
+        Assert.Equal("hello", (await c1).Arg<string>());
+        Assert.Equal("hello", (await c2).Arg<string>());
     }
 
     [RetryFact]
@@ -29,7 +29,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await caller.Send.SendToCaller("from-caller");
 
-        Assert.Equal("from-caller", (await callerMsg).Arg<string>(0));
+        Assert.Equal("from-caller", (await callerMsg).Arg<string>());
         await other.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -45,8 +45,8 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await caller.Send.SendToOthers("broadcast-others");
 
-        Assert.Equal("broadcast-others", (await o1).Arg<string>(0));
-        Assert.Equal("broadcast-others", (await o2).Arg<string>(0));
+        Assert.Equal("broadcast-others", (await o1).Arg<string>());
+        Assert.Equal("broadcast-others", (await o2).Arg<string>());
         await caller.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -65,8 +65,8 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await member1.Send.SendToAllInGroup("alpha", "group-msg");
 
-        Assert.Equal("group-msg", (await m1).Arg<string>(0));
-        Assert.Equal("group-msg", (await m2).Arg<string>(0));
+        Assert.Equal("group-msg", (await m1).Arg<string>());
+        Assert.Equal("group-msg", (await m2).Arg<string>());
         await outsider.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -84,7 +84,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await member1.Send.SendToAllInGroup("beta", "after-remove");
 
-        Assert.Equal("after-remove", (await m1).Arg<string>(0));
+        Assert.Equal("after-remove", (await m1).Arg<string>());
         await member2.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -100,7 +100,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await sender.Send.SendToConnection(targetId, "direct");
 
-        Assert.Equal("direct", (await recv).Arg<string>(0));
+        Assert.Equal("direct", (await recv).Arg<string>());
         await bystander.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -119,8 +119,8 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await sender.Send.SendToConnections([t1, t2], "multi");
 
-        Assert.Equal("multi", (await r1).Arg<string>(0));
-        Assert.Equal("multi", (await r2).Arg<string>(0));
+        Assert.Equal("multi", (await r1).Arg<string>());
+        Assert.Equal("multi", (await r2).Arg<string>());
     }
 
     [RetryFact]
@@ -137,8 +137,8 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await client1.Send.SendToAllExcept("nope", excludedId);
 
-        Assert.Equal("nope", (await m1).Arg<string>(0));
-        Assert.Equal("nope", (await m2).Arg<string>(0));
+        Assert.Equal("nope", (await m1).Arg<string>());
+        Assert.Equal("nope", (await m2).Arg<string>());
         await excluded.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -154,8 +154,8 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await user2.Send.SendToUser("u1", "user-msg");
 
-        Assert.Equal("user-msg", (await r1).Arg<string>(0));
-        Assert.Equal("user-msg", (await r2).Arg<string>(0));
+        Assert.Equal("user-msg", (await r1).Arg<string>());
+        Assert.Equal("user-msg", (await r2).Arg<string>());
         await user2.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -171,8 +171,8 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await user3.Send.SendToUsers(["u1", "u2"], "multi-user");
 
-        Assert.Equal("multi-user", (await r1).Arg<string>(0));
-        Assert.Equal("multi-user", (await r2).Arg<string>(0));
+        Assert.Equal("multi-user", (await r1).Arg<string>());
+        Assert.Equal("multi-user", (await r2).Arg<string>());
         await user3.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }
