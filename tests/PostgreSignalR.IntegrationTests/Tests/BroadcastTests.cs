@@ -15,8 +15,8 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await client1.Send.SendToAll(ShortMessage);
 
-        Assert.Equal(ShortMessage, (await messageFromClient1).Arg<string>(0));
-        Assert.Equal(ShortMessage, (await messageFromClient2).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromClient1).Arg<string>());
+        Assert.Equal(ShortMessage, (await messageFromClient2).Arg<string>());
     }
 
     [RetryFact]
@@ -29,7 +29,7 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await caller.Send.SendToCaller(ShortMessage);
 
-        Assert.Equal(ShortMessage, (await messageFromCaller).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromCaller).Arg<string>());
         await other.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
@@ -45,8 +45,8 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await caller.Send.SendToOthers(ShortMessage);
 
-        Assert.Equal(ShortMessage, (await messageFromOther1).Arg<string>(0));
-        Assert.Equal(ShortMessage, (await messageFromOther2).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromOther1).Arg<string>());
+        Assert.Equal(ShortMessage, (await messageFromOther2).Arg<string>());
 
         await caller.EnsureNoMessageAsync(nameof(IClient.Message));
     }
@@ -65,8 +65,8 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await client1.Send.SendToAllExcept(ShortMessage, excludedId);
 
-        Assert.Equal(ShortMessage, (await messageFromClient1).Arg<string>(0));
-        Assert.Equal(ShortMessage, (await messageFromClient2).Arg<string>(0));
+        Assert.Equal(ShortMessage, (await messageFromClient1).Arg<string>());
+        Assert.Equal(ShortMessage, (await messageFromClient2).Arg<string>());
 
         await excluded.EnsureNoMessageAsync(nameof(IClient.Message));
     }

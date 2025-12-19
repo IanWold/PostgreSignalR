@@ -15,7 +15,7 @@ public class LargePayloadTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await client1.Send.SendToAll(LongMessage);
 
-        Assert.Equal(LongMessage, (await messageFromClient1).Arg<string>(0));
-        Assert.Equal(LongMessage, (await messageFromClient2).Arg<string>(0));
+        Assert.Equal(LongMessage, (await messageFromClient1).Arg<string>());
+        Assert.Equal(LongMessage, (await messageFromClient2).Arg<string>());
     }
 }

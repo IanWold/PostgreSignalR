@@ -12,6 +12,7 @@ public interface IServer
     Task LeaveGroup(string groupName);
     Task SendToAllInGroup(string groupName, string message);
     Task SendToAllInGroups(string[] groupNames, string message);
+    Task SendToOthersInGroup(string groupName, string message);
     Task SendToGroupExcept(string groupName, string excludedConnectionId, string message);
     Task SendToConnection(string connectionId, string message);
     Task SendToConnections(string[] connectionIds, string message);
