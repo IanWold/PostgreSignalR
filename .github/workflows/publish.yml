@@ -19,6 +19,6 @@ jobs:
         arrTag=(${GITHUB_REF//\// })
         VERSION="${arrTag[2]}"
         VERSION="${VERSION//v}"
-        dotnet pack PostgreSignalR/PostgreSignalR.csproj -c Release -p:PackageVersion=$VERSION
+        dotnet pack src/PostgreSignalR.csproj -c Release -p:PackageVersion=$VERSION
     - name: Publish
       run: dotnet nuget push "**/PostgreSignalR.*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key ${{ secrets.NUGET_KEY }} --skip-duplicate
