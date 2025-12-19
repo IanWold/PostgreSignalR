@@ -4,8 +4,12 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="tests/PostgreSignalR.IntegrationTests.Abstractions/PostgreSignalR.IntegrationTests.Abstractions.csproj" />
-  <Project Path="tests/PostgreSignalR.IntegrationTests.App/PostgreSignalR.IntegrationTests.App.csproj" />
-  <Project Path="tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj" />
+
   <Project Path="src/PostgreSignalR.csproj" />
+
+  <Folder Name="/Tests/">
+    <Project Path="tests/PostgreSignalR.IntegrationTests.Abstractions/PostgreSignalR.IntegrationTests.Abstractions.csproj" />
+    <Project Path="tests/PostgreSignalR.IntegrationTests.App/PostgreSignalR.IntegrationTests.App.csproj" />
+    <Project Path="tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj" />
+  </Folder>
 </Solution>
