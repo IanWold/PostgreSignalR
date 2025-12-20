@@ -12,7 +12,7 @@ internal sealed class PostgresChannels(string prefix, string returnServerName)
 
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name))).ToLowerInvariant();
         var suffix = $"_{hash[..8]}";
-        var trimLength = Math.Max(_maxIdentifierLength - suffix.Length, 0);
+        var trimLength = Math.Min(Math.Max(_maxIdentifierLength - suffix.Length, 0), name.Length);
 
         return $"{name[..trimLength]}{suffix}";
     }
