@@ -43,6 +43,7 @@ var dataSource = new NpgsqlDataSourceBuilder("<your_postgres_connection_string>"
 builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
 {
     options.Prefix = "myapp";
+    options.ChannelNameNormaization = ChannelNameNormaization.Truncate;
     options.OnInitialized += () => { /* Do something */ }
 });
 ```
