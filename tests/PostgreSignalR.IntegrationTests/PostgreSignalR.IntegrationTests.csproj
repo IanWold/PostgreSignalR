@@ -18,7 +18,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="xRetry.v3" Version="1.0.0-rc2" />
+    <PackageReference Include="xRetry.v3" Version="1.0.0-rc3" />
   </ItemGroup>
 
   <ItemGroup>
