@@ -22,7 +22,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
     private readonly PostgresSubscriptionManager _groups = new();
     private readonly PostgresSubscriptionManager _users = new();
     private readonly AckHandler _ackHandler;
-    private readonly PostgresChannels _channels;
+    private readonly ChannelNameProvider _channels;
     private readonly IHubProtocolResolver _hubProtocolResolver;
     private readonly ILogger<PostgresHubLifetimeManager<THub>> _logger;
     private readonly PostgresBackplaneOptions _options;
@@ -45,11 +45,27 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         ILogger<PostgresHubLifetimeManager<THub>> logger
     )
     {
+        _options = options.Value;
+
+        if (!_options.IsValid(out var validationMessage))
+        {
+            logger.BackplaneConfigurationInvalid(validationMessage!);
+            throw new Exception(validationMessage);
+        }
+
         _hubProtocolResolver = hubProtocolResolver;
         _logger = logger;
-        _options = options.Value;
         _ackHandler = new AckHandler();
-        _channels = new PostgresChannels(_options.Prefix, _serverName);
+
+        var prefix = string.IsNullOrEmpty(_options.Prefix)
+            ? string.Empty
+            : $"{_options.Prefix.TrimEnd("_")}_";
+
+        _channels = _options.ChannelNameNormaization switch
+        {
+            ChannelNameNormaization.Truncate => new TruncatingChannelNameProvider(prefix, _serverName),
+            ChannelNameNormaization.HashAlways or _ => new HashingChannelNameProvider(prefix, _serverName)
+        };
 
         if (globalHubOptions != null && hubOptions != null)
         {
