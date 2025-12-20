@@ -6,13 +6,9 @@ internal sealed class PostgresChannels(string prefix, string returnServerName)
 {
     private const int _maxIdentifierLength = 63;
 
-    private static string Sanitize(string name)
+    private static string Normalize(string name)
     {
-        // Postgres identifiers are limited to 63 bytes. If we exceed that, trim and add a hash suffix for uniqueness.
-        if (name.Length <= _maxIdentifierLength)
-        {
-            return name;
-        }
+        name = name.Replace('-', '_');
 
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(name))).ToLowerInvariant();
         var suffix = $"_{hash[..8]}";
@@ -20,8 +16,6 @@ internal sealed class PostgresChannels(string prefix, string returnServerName)
 
         return $"{name[..trimLength]}{suffix}";
     }
-
-    private static string Normalize(string value) => Sanitize(value.Replace('-', '_'));
 
     /// <summary>
     /// Gets the name of the channel for sending to all connections.
