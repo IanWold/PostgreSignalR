@@ -57,7 +57,7 @@ public sealed class TablePayloadStrategy : IPostgresBackplanePayloadStrategy
 {
     private readonly IOptions<PostgresBackplaneOptions> _backplaneOptions;
     private readonly string _tableName;
-    private readonly string _reqdQuery;
+    private readonly string _readQuery;
     private readonly string _cleanupQuery;
 
     private readonly EventPayloadStrategy? _eventStrategy;
@@ -68,7 +68,7 @@ public sealed class TablePayloadStrategy : IPostgresBackplanePayloadStrategy
     {
         _backplaneOptions = backplaneOptions;
         _tableName = tableOptions.Value.QualifiedTableName;
-        _reqdQuery = $"SELECT payload FROM {tableOptions.Value.QualifiedTableName} WHERE id = @id;";
+        _readQuery = $"SELECT payload FROM {tableOptions.Value.QualifiedTableName} WHERE id = @id;";
         _cleanupQuery = $"DELETE FROM {tableOptions.Value.QualifiedTableName} WHERE EXTRACT(EPOCH FROM (NOW() - created_at)) * 1000 > {tableOptions.Value.AutomaticCleanupTtlMs};";
 
         if (tableOptions.Value.AutomaticCleanup)
@@ -142,7 +142,7 @@ public sealed class TablePayloadStrategy : IPostgresBackplanePayloadStrategy
         }
 
         using var connection = _backplaneOptions.Value.DataSource.OpenConnection();
-        using var command = new NpgsqlCommand(_reqdQuery, connection);
+        using var command = new NpgsqlCommand(_readQuery, connection);
 
         command.Parameters.Add(new("id", Convert.ToInt64(eventArgs.Payload[3..])));
 

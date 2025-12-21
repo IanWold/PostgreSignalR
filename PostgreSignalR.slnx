@@ -6,6 +6,13 @@
   </Configurations>
 
   <Project Path="src/PostgreSignalR.csproj" />
+  
+  <Folder Name="/Examples/">
+    <Project Path="examples/PostgreSignalR.Examples.BasicSetup/PostgreSignalR.Examples.BasicSetup.csproj" />
+    <Project Path="examples/PostgreSignalR.Examples.CustomPayloadStrategy/PostgreSignalR.Examples.CustomPayloadStrategy.csproj" />
+    <Project Path="examples/PostgreSignalR.Examples.CustomTable/PostgreSignalR.Examples.CustomTable.csproj" />
+    <Project Path="examples/PostgreSignalR.Examples.TablePayloadSetup/PostgreSignalR.Examples.TablePayloadSetup.csproj" />
+  </Folder>
 
   <Folder Name="/Tests/">
     <Project Path="tests/PostgreSignalR.IntegrationTests.Abstractions/PostgreSignalR.IntegrationTests.Abstractions.csproj" />

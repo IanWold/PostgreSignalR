@@ -3,7 +3,7 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests.App;
 
-public class TestHub() : Hub<IClient>, IServer
+public class TestHub : Hub<IClient>, IServer
 {
     public override async Task OnConnectedAsync() =>
         await base.OnConnectedAsync();

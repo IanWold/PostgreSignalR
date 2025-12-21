@@ -10,8 +10,8 @@ internal abstract class ChannelNameProvider
     public ChannelNameProvider(string returnServerName)
     {
         All = Normalize("all");
-        GroupManagement = Normalize("internal_groups");
-        ReturnResults = Normalize($"internal_return_{returnServerName}");
+        GroupManagement = Normalize("grp_mgm");
+        ReturnResults = Normalize($"ret_{returnServerName}");
     }
 
     /// <summary>
@@ -46,28 +46,28 @@ internal abstract class ChannelNameProvider
     /// </summary>
     /// <param name="connectionId">The ID of the connection to get the channel for.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string Connection(string connectionId) => Normalize($"connection_{connectionId}");
+    public string Connection(string connectionId) => Normalize($"con_{connectionId}");
 
     /// <summary>
     /// Gets the name of the channel for sending a message to a named group of connections.
     /// </summary>
     /// <param name="groupName">The name of the group to get the channel for.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string Group(string groupName) => Normalize($"group_{groupName}");
+    public string Group(string groupName) => Normalize($"grp_{groupName}");
 
     /// <summary>
     /// Gets the name of the channel for sending a message to all collections associated with a user.
     /// </summary>
     /// <param name="userId">The ID of the user to get the channel for.</param>32
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string User(string userId) => Normalize($"user_{userId}");
+    public string User(string userId) => Normalize($"usr_{userId}");
 
     /// <summary>
     /// Gets the name of the acknowledgement channel for the specified server.
     /// </summary>
     /// <param name="serverName">The name of the server to get the acknowledgement channel for.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string Ack(string serverName) => Normalize($"internal_ack_{serverName}");
+    public string Ack(string serverName) => Normalize($"ack_{serverName}");
 }
 
 internal sealed class TruncatingChannelNameProvider(string prefix, string returnServerName) : ChannelNameProvider(returnServerName)
