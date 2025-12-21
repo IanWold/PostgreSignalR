@@ -9,4 +9,10 @@ public class ClientReceiver(Func<string, object?[], Task> callback) : IClient
 
     public Task<string> EchoBack(string message) =>
         Task.FromResult($"echo:{message}");
+
+    public Task MessageSimpleObject(SimpleObject obj) =>
+        callback(nameof(IClient.MessageSimpleObject), [obj]);
+
+    public Task MessageComplexObject(ComplexObject obj) =>
+        callback(nameof(IClient.MessageComplexObject), [obj]);
 }

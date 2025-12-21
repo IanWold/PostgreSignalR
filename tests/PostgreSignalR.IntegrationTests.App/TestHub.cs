@@ -58,4 +58,36 @@ public class TestHub : Hub<IClient>, IServer
 
     public async Task<string> InvokeConnectionEcho(string connectionId, string message) =>
         await Clients.Client(connectionId).EchoBack(message);
+
+    #region SimpleObject
+
+    public async Task SendToAll_SimpleObject(SimpleObject obj) =>
+        await Clients.All.MessageSimpleObject(obj);
+
+    public async Task SendToConnection_SimpleObject(string connectionId, SimpleObject obj) =>
+        await Clients.Client(connectionId).MessageSimpleObject(obj);
+
+    public async Task SendToAllInGroup_SimpleObject(string groupName, SimpleObject obj) =>
+        await Clients.Group(groupName).MessageSimpleObject(obj);
+
+    public async Task SendToUsers_SimpleObject(string[] userIds, SimpleObject obj) =>
+        await Clients.Users(userIds).MessageSimpleObject(obj);
+
+    #endregion
+
+    #region ComplexObject
+
+    public async Task SendToAll_ComplexObject(ComplexObject obj) =>
+        await Clients.All.MessageComplexObject(obj);
+
+    public async Task SendToConnection_ComplexObject(string connectionId, ComplexObject obj) =>
+        await Clients.Client(connectionId).MessageComplexObject(obj);
+
+    public async Task SendToAllInGroup_ComplexObject(string groupName, ComplexObject obj) =>
+        await Clients.Group(groupName).MessageComplexObject(obj);
+
+    public async Task SendToUsers_ComplexObject(string[] userIds, ComplexObject obj) =>
+        await Clients.Users(userIds).MessageComplexObject(obj);
+
+    #endregion
 }
