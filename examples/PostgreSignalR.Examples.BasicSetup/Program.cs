@@ -24,7 +24,7 @@ builder.Services
             // options.Prefix = "abcdefghijklmnopqrstuvwxyz";
             // Because channel names have limited length (see below) shorter prefixes are better.
             // The default prefix is:
-            // options.Prefix = "postgresignalr";
+            // options.Prefix = "backplane";
             // Which can help distinguish backplane notifications from other notifications.
             // However, if you're not using NOTIFY for anything else (or don't care),
             //     then setting prefix to string.Empty would be the most performant

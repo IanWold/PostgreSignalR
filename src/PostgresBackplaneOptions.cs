@@ -32,12 +32,12 @@ public class PostgresBackplaneOptions
 {
     /// <summary>
     /// Configures a prefix for Postgres notification channel names.
-    /// Default: <c>"postgresignalr"</c>
+    /// Default: <c>"backplane"</c>
     /// </summary>
     /// <remarks>
     /// If multiple apps are using the same database for notifications, each should have a different prefix.
     /// </remarks>
-    public string Prefix { get; set; } = "postgresignalr";
+    public string Prefix { get; set; } = "backplane";
 
     /// <summary>
     /// Configures how the backplane normalizes channel names.
