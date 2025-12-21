@@ -7,6 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("backplane") ?? throw new Exception("Postgres backplane connection string required.");
 var dataSource = new NpgsqlDataSourceBuilder(connectionString).Build();
 
+// Sample migration code; sets up the custom table.
+// See https://gist.github.com/IanWold/d466f0e7e983da7b09e5ecc6bf719341
 DatabaseMigrator.Migrate(dataSource, "./Migrations");
 
 builder.Services

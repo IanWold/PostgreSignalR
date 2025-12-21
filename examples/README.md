@@ -2,7 +2,7 @@
 
 These example applications demonstrate different ways you can configure PostgreSignalR to suit your needs.
 
-## [Basic Setup](/PostgreSignalR.Examples.BasicSetup)
+## Example: [Basic Setup](/PostgreSignalR.Examples.BasicSetup)
 
 This project demonstrates the basic configuration options for PostgreSignalR, not considering any advanced setups below. The default options will be good for the majority of use cases, but some simple configurations may want to be chosen.
 
@@ -16,7 +16,7 @@ The options demonstrated in this example are: `Prefix`, `ChannelNameNormalizatio
 
 In order to run this example, you will need to provide your own Postgres connection string in [appsettings.json](/PostgreSignalR.Examples.BasicSetup/appsettings.json).
 
-## [Table Payload Strategy](/PostgreSignalR.Examples.TablePayloadSetup)
+## Example: [Table Payload Strategy](/PostgreSignalR.Examples.TablePayloadSetup)
 
 PostgreSignalR uses [PostgreSQL's NOTIFY](https://www.postgresql.org/docs/current/sql-notify.html) to send messages between connected servers. By default, PostgreSignalR sends its messages directly inside the NOTIFY payload. This works for the majority of scenarios, however Postgres limits the payload size to 8kb, which may be too limited for some scenarios.
 
@@ -40,7 +40,7 @@ The table payload strategy example demonstrates using a payload table that is pr
 
 If you need more control over the table (such as wanting to implement a better way of handling cleanup), the built-in table payload strategy does allow you to implement a custom table:
 
-### [Custom Table](/PostgreSignalR.Examples.CustomTable)
+### Example: [Custom Table](/PostgreSignalR.Examples.CustomTable)
 
 While the built-in table payload strategy does have a built-in table, there are a number of reasons you might want to use the strategy with a custom table. If you want to be able to set up triggers on this table, or implement robust cleanup handling, it's better to implement your own payload table.
 
@@ -54,5 +54,8 @@ Further, if you want to use the built-in automatic cleanup, your table must have
 
 This [Custom Table](/PostgreSignalR.Examples.CustomTable) example implements a custom table with a `pg_cron` job scheduled to perform cleanup on the table. If you're implementing your own cleanup, do be sure to configure the table backplane strategy to not use automatic cleanup.
 
-## [Custom Payload Strategy](/PostgreSignalR.Examples.CustomPayloadStrategy)
+* [Program.cs](/PostgreSignalR.Examples.CustomTable/Program.cs) contains notes on the configuration options chosen, and
+* [CreatePayloadTable.sql](/PostgreSignalR.Examples.CustomTable/Migrations/1_CreatePayloadTable.sql) contains notes on the table and pg_cron implementations.
+
+## Example: [Custom Payload Strategy](/PostgreSignalR.Examples.CustomPayloadStrategy)
 
