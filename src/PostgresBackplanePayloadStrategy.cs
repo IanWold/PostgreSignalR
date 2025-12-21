@@ -156,7 +156,7 @@ public sealed class TablePayloadStrategy : IPostgresBackplanePayloadStrategy
     /// <summary>
     /// Creates a standard table in Postgres to store payloads.
     /// </summary>
-    /// <param name="ct">THe <see cref="CancellationToken"/>.</param>
+    /// <param name="ct">The <see cref="CancellationToken"/>.</param>
     /// <returns>A <see cref="Task"/> representing the work.</returns>
     public async Task InitializeTableAsync(CancellationToken ct = default)
     {
