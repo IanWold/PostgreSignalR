@@ -11,4 +11,10 @@
     <PackageReference Include="PostgreSignalR" Version="0.3.2-alpha" />
   </ItemGroup>
 
+	<ItemGroup>
+		<Content Include="Migrations\*.sql">
+		<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
 </Project>
