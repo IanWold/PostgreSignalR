@@ -22,5 +22,5 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Test
-      run: dotnet test PostgreSignalR.slnx --no-build --verbosity normal -m:1
+      run: dotnet test PostgreSignalR.slnx --no-build --verbosity normal -m:1 -- --stop-on-fail on
       timeout-minutes: 10
