@@ -36,7 +36,7 @@ That is all you need to get up and going! PostgreSignalR aims to be very extensi
 
 ### Backplane Configuration
 
-You can configure options for the backplane. All of the options are presented below and [documented in detail in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Options):
+You can configure options for the backplane. All of the options are presented below and [documented in detail in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Configuration):
 
 ```csharp
 var dataSource = new NpgsqlDataSourceBuilder("<your_postgres_connection_string>").Build();
@@ -58,7 +58,7 @@ builder.Services.AddSignalR()
     .AddBackplaneTablePayloadStrategy();
 ```
 
-The payload table strategy comes with its own configuration options as well. All of the options are presented below and [documented in detail in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Options):
+The payload table strategy comes with its own configuration options as well. All of the options are presented below and [documented in detail in the wiki](https://github.com/IanWold/PostgreSignalR/wiki/Payload-Strategies):
 
 ```csharp
 builder.Services.AddSignalR()
@@ -108,15 +108,15 @@ Alpha and beta versions will progress through `0.x.0-alpha` and `0.x.0-beta`, wh
 
 # Developing and Testing
 
-The backplane code tracks very closely to that of the [official Redis backplane](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/server/StackExchangeRedis), in fact this project started by cloning that code and changing it to use Postgres' notify/listen in lieu of Redis' pub/sub. Postgres and Redis function quite similarly, for these purposes, so nothing major is changed in this repo. While there are a number of helper classes constructed to handle things like messagepack and acks, all of the main code is in [`PostgresHubLifetimeManager`](https://github.com/IanWold/PostgreSignalR/blob/main/PostgreSignalR/PostgresHubLifetimeManager.cs), which implements the essential `HubLifetimeManager` base class.
+The backplane code tracks very closely to that of the [official Redis backplane](https://github.com/dotnet/aspnetcore/tree/main/src/SignalR/server/StackExchangeRedis), in fact this project started by cloning that code and changing it to use Postgres' notify/listen in lieu of Redis' pub/sub. Postgres and Redis function quite similarly, for these purposes, so nothing major is changed in this repo. While there are a number of helper classes constructed to handle things like messagepack and acks, all of the main code is in [`PostgresHubLifetimeManager`](https://github.com/IanWold/PostgreSignalR/blob/main/src/PostgresHubLifetimeManager.cs), which implements the essential `HubLifetimeManager` base class.
 
-One important difference between Redis and Postgres is that [Npgsql requires a blocked thread in order to listen to notifications in real-time](https://www.npgsql.org/doc/wait.html). This required developing a [new listener class to maintain a separate listening thread](https://github.com/IanWold/PostgreSignalR/blob/main/PostgreSignalR/PostgresListener.cs). Another departure from the reference code is implementing the [logger extension pattern](https://learn.microsoft.com/en-us/dotnet/core/extensions/high-performance-logging) to provide more logging in a performance-sensitive way.
+One important difference between Redis and Postgres is that [Npgsql requires a blocked thread in order to listen to notifications in real-time](https://www.npgsql.org/doc/wait.html). This required developing a [new listener class to maintain a separate listening thread](https://github.com/IanWold/PostgreSignalR/blob/main/src/PostgresListener.cs). Another departure from the reference code is implementing the [logger extension pattern](https://learn.microsoft.com/en-us/dotnet/core/extensions/high-performance-logging) to provide more logging in a performance-sensitive way.
 
 Going forward, there is no requirement that this codebase conforms to the architecture or general structure of the Redis backplane, this implementation was chosen for ease. If any opportunities to improve the library come about and require a change to this structure, I'm happy to entertain that change.
 
 ### Tests
 
-Being an inherently network-related product, integration tests provide the greatest source of confidence in the functionality of the backplane. [The integration test project](https://github.com/IanWold/PostgreSignalR/tree/main/PostgreSignalR.IntegrationTests) is set up well to be able to test various scenarios involving multiple servers and clients. These tests use [Testcontainers](https://dotnet.testcontainers.org/) to create a Postgres server with an individual Postgres database per test. They also have a [standalone SignalR server](https://github.com/IanWold/PostgreSignalR/tree/main/PostgreSignalR.IntegrationTests.App) providing functionality to cover all of the SignalR use cases. The integration tests can create multiple, separate instances of this server on Docker, and for each server can create multiple, separate clients. This makes it easy to cover various scenarios:
+Being an inherently network-related product, integration tests provide the greatest source of confidence in the functionality of the backplane. [The integration test project](https://github.com/IanWold/PostgreSignalR/tree/main/tests/PostgreSignalR.IntegrationTests) is set up well to be able to test various scenarios involving multiple servers and clients. These tests use [Testcontainers](https://dotnet.testcontainers.org/) to create a Postgres server with an individual Postgres database per test. They also have a [standalone SignalR server](https://github.com/IanWold/PostgreSignalR/tree/main/tests/PostgreSignalR.IntegrationTests.App) providing functionality to cover all of the SignalR use cases. The integration tests can create multiple, separate instances of this server on Docker, and for each server can create multiple, separate clients. This makes it easy to cover various scenarios:
 
 ```csharp
 [RetryFact]
