@@ -26,8 +26,14 @@ public class CustomPayloadStrategy(IOptions<PostgresBackplaneOptions> backplaneO
 
     public byte[] ResolveNotificationPayload(NpgsqlNotificationEventArgs eventArgs)
     {
+        var query = """
+            SELECT payload
+            FROM backplane_notifications
+            WHERE id = @id;
+            """;
+
         using var connection = backplaneOptions.Value.DataSource.OpenConnection();
-        using var command = new NpgsqlCommand("SELECT payload FROM backplane_notifications WHERE id = @id", connection);
+        using var command = new NpgsqlCommand(query, connection);
 
         command.Parameters.Add(new("id", Convert.ToInt64(eventArgs.Payload)));
 
