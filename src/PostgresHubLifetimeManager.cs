@@ -16,6 +16,17 @@ file class PostgresFeature
     public HashSet<string> Groups { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
 
+file class FakeInvocationBinder : IInvocationBinder
+{
+    public static readonly FakeInvocationBinder Instance = new();
+
+    public IReadOnlyList<Type> GetParameterTypes(string methodName) => throw new NotImplementedException();
+
+    public Type GetReturnType(string invocationId) => typeof(RawResult);
+
+    public Type GetStreamItemType(string streamId) => throw new NotImplementedException();
+}
+
 public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>, IDisposable where THub : Hub
 {
     private readonly HubConnectionStore _connections = new();
@@ -802,15 +813,4 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         Debug.Assert(base64.EndsWith("=="));
         return new string(base64[..^2]);
     }
-}
-
-file class FakeInvocationBinder : IInvocationBinder
-{
-    public static readonly FakeInvocationBinder Instance = new();
-
-    public IReadOnlyList<Type> GetParameterTypes(string methodName) => throw new NotImplementedException();
-
-    public Type GetReturnType(string invocationId) => typeof(RawResult);
-
-    public Type GetStreamItemType(string streamId) => throw new NotImplementedException();
 }
