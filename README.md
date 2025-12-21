@@ -44,7 +44,7 @@ builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
 {
     options.Prefix = "myapp";
     options.ChannelNameNormaization = ChannelNameNormaization.Truncate;
-    options.OnInitialized += () => { /* Do something */ }
+    options.OnInitialized += () => { /* Do something */ };
 });
 ```
 
