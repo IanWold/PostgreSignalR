@@ -3,6 +3,24 @@ using Npgsql;
 namespace PostgreSignalR;
 
 /// <summary>
+/// Postgres limits channel names to identifiers up to 63 characters.
+/// To guarantee this constraint is met, the backplane normalizes channel names.
+/// </summary>
+public enum ChannelNameNormaization
+{
+    /// <summary>
+    /// Only applies normalization to channel names greater than 63 characters.
+    /// For large names, the last 8 characters will be a hash of the channel name
+    /// </summary>
+    Truncate,
+
+    /// <summary>
+    /// Always hashes the channel name. The prefix is not modified.
+    /// </summary>
+    HashAlways
+}
+
+/// <summary>
 /// Handler for <see cref="PostgresBackplaneOptions.OnInitialized"/>
 /// </summary>
 public delegate void OnInitializedHandler();
@@ -20,6 +38,17 @@ public class PostgresBackplaneOptions
     /// If multiple apps are using the same database for notifications, each should have a different prefix.
     /// </remarks>
     public string Prefix { get; set; } = "postgresignalr";
+
+    /// <summary>
+    /// Configures how the backplane normalizes channel names.
+    /// Possible values:
+    /// <list type="bullet">
+    ///     <item><see cref="ChannelNameNormaization.Truncate"/>: Truncates long channel names with a short hash. Better for performance.</item>
+    ///     <item><see cref="ChannelNameNormaization.HashAlways"/>: Always hashes channel names. Better for safety.</item>
+    /// </list>
+    /// Default: <see cref="ChannelNameNormaization.Truncate"/>
+    /// </summary>
+    public ChannelNameNormaization ChannelNameNormaization { get; set; } = ChannelNameNormaization.Truncate;
 
     /// <summary>
     /// Configures the <see href="https://www.npgsql.org/doc/api/Npgsql.NpgsqlDataSource.html">NpgsqlDataSource</see> to connect to the Postgres database.
@@ -41,4 +70,16 @@ public class PostgresBackplaneOptions
 
     internal void InvokeOnInitialized() =>
         OnInitialized?.Invoke();
+
+    internal bool IsValid(out string? message)
+    {
+        message = null;
+
+        if (Prefix.Length >= 20)
+        {
+            message = "Prefix must be less than 20 characters.";
+        }
+
+        return message is null;
+    }
 }

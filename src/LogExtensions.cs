@@ -122,4 +122,11 @@ internal static partial class LogExtensions
         Message = "Postgres backplane encountered error while handling OnInitialized event. Ignoring."
     )]
     public static partial void BackplaneErrorDuringOnInitialized(this ILogger logger, Exception ex);
+
+    [LoggerMessage(
+        EventId = 160,
+        Level = LogLevel.Error,
+        Message = "Postgres backplane configuration is invalid: {Message}"
+    )]
+    public static partial void BackplaneConfigurationInvalid(this ILogger logger, string message);
 }
