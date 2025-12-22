@@ -32,7 +32,12 @@ Setting up the Postgres backplane for SignalR is very simple. If you've configur
 builder.Services.AddSignalR().AddPostgresBackplane("<your_postgres_connection_string>");
 ```
 
-That is all you need to get up and going! PostgreSignalR aims to be very extensible though, so there are some extra options you might find useful.
+That is all you need to get up and going! PostgreSignalR aims to be very extensible though, so there are some extra options you might find useful. PostgreSignalR will use your connection string to build an [NpgsqlDataSource](https://www.npgsql.org/doc/basic-usage.html), so if you already have a data source you can provide that directly:
+
+```csharp
+var dataSource = new NpgsqlDataSourceBuilder("<your_postgres_connection_string>").Build();
+builder.Services.AddSignalR().AddPostgresBackplane(dataSource);
+```
 
 ### Backplane Configuration
 
