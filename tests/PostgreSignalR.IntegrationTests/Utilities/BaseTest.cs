@@ -12,21 +12,19 @@ public class BaseTest(ContainerFixture fixture)
     internal string LongMessage { get; } = new string('A', 10000);
 
     internal SimpleObject RandomSimpleObject { get; } = GetSimpleObject();
-    internal ComplexObject RandomComplexObject { get; } = new()
-    {
-        SimpleObjectProperty = GetSimpleObject(),
-        SimpleObjectsProperty = [ GetSimpleObject(), GetSimpleObject(), GetSimpleObject() ],
-        SimpleObjectsDictionaryProperty = new()
+    internal ComplexObject RandomComplexObject { get; } = new(
+        GetSimpleObject(),
+        [ GetSimpleObject(), GetSimpleObject(), GetSimpleObject() ],
+        new()
         {
             ["a"] = GetSimpleObject(),
             ["b"] = GetSimpleObject(),
             ["c"] = GetSimpleObject()
         }
-    };
+    );
 
-    private static SimpleObject GetSimpleObject() => new()
-    {
-        IntProperty = Random.Shared.Next(0, 100),
-        StringProperty = Guid.NewGuid().ToString()
-    };
+    private static SimpleObject GetSimpleObject() => new(
+        Random.Shared.Next(0, 100),
+        Guid.NewGuid().ToString()
+    );
 }
