@@ -9,7 +9,13 @@ var dataSource = new NpgsqlDataSourceBuilder(connectionString).Build();
 builder.Services
     .AddSignalR()
     .AddPostgresBackplane(
+        // Npgsql introduced data sources in version 7, and PostgreSignalR prefers using them.
+        // However, if you prefer to pass a connection string instead, you can.
         dataSource,
+        // connectionString
+
+
+        
         options =>
         {
             // The prefix is prepended to every channel name used by the backplane.

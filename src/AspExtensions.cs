@@ -11,7 +11,16 @@ public static class AspExtensions
     /// Adds scale-out to a <see cref="ISignalRServerBuilder"/>, using a shared Postgres database.
     /// </summary>
     /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
-    /// <param name="postgresConnectionString">The connection string used to connect to the Postgres database.</param>
+    /// <param name="connectionString">The connection string used to connect to the Postgres database.</param>
+    /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
+    public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, string connectionString) =>
+        AddPostgresBackplane(signalrBuilder, o => o.DataSource = new NpgsqlDataSourceBuilder(connectionString).Build());
+
+    /// <summary>
+    /// Adds scale-out to a <see cref="ISignalRServerBuilder"/>, using a shared Postgres database.
+    /// </summary>
+    /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
+    /// <param name="dataSource">The <see cref="Npgsql.NpgsqlDataSource"/> used to connect to the Postgres database.</param>
     /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
     public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, NpgsqlDataSource dataSource) =>
         AddPostgresBackplane(signalrBuilder, o => o.DataSource = dataSource);
@@ -20,7 +29,21 @@ public static class AspExtensions
     /// Adds scale-out to a <see cref="ISignalRServerBuilder"/>, using a shared Postgres database.
     /// </summary>
     /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
-    /// <param name="postgresConnectionString">The connection string used to connect to the Postgres database.</param>
+    /// <param name="connectionString">The connection string used to connect to the Postgres database.</param>
+    /// <param name="configure">A callback to configure the Postgres options.</param>
+    /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
+    public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, string connectionString, Action<PostgresBackplaneOptions> configure) =>
+        AddPostgresBackplane(signalrBuilder, o =>
+        {
+            o.DataSource = new NpgsqlDataSourceBuilder(connectionString).Build();
+            configure(o);
+        });
+
+    /// <summary>
+    /// Adds scale-out to a <see cref="ISignalRServerBuilder"/>, using a shared Postgres database.
+    /// </summary>
+    /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
+    /// <param name="dataSource">The <see cref="Npgsql.NpgsqlDataSource"/> used to connect to the Postgres database.</param>
     /// <param name="configure">A callback to configure the Postgres options.</param>
     /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
     public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, NpgsqlDataSource dataSource, Action<PostgresBackplaneOptions> configure) =>
