@@ -2,12 +2,12 @@ using System.Linq;
 
 namespace PostgreSignalR.IntegrationTests.Abstractions;
 
-public record ComplexObject(
-    SimpleObject SimpleObjectProperty,
-    List<SimpleObject> SimpleObjectsProperty,
-    Dictionary<string, SimpleObject> SimpleObjectsDictionaryProperty
-)
+public class ComplexObject
 {
+    SimpleObject SimpleObjectProperty { get; set; }
+    List<SimpleObject> SimpleObjectsProperty { get; set; }
+    Dictionary<string, SimpleObject> SimpleObjectsDictionaryProperty { get; set; }
+
     public override bool Equals(object o) =>
         o is ComplexObject c
         && c.SimpleObjectProperty == SimpleObjectProperty
