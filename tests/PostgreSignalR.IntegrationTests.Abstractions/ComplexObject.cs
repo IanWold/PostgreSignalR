@@ -4,9 +4,9 @@ namespace PostgreSignalR.IntegrationTests.Abstractions;
 
 public class ComplexObject
 {
-    SimpleObject SimpleObjectProperty { get; set; }
-    List<SimpleObject> SimpleObjectsProperty { get; set; }
-    Dictionary<string, SimpleObject> SimpleObjectsDictionaryProperty { get; set; }
+    public required SimpleObject SimpleObjectProperty { get; set; }
+    public required List<SimpleObject> SimpleObjectsProperty { get; set; }
+    public required Dictionary<string, SimpleObject> SimpleObjectsDictionaryProperty { get; set; }
 
     public override bool Equals(object o) =>
         o is ComplexObject c
