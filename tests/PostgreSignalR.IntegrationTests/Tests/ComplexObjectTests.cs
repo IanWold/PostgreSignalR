@@ -1,5 +1,3 @@
-Commented to get the simples through PR
-
 using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests.Tests;
