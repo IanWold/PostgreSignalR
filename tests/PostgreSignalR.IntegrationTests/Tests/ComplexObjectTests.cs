@@ -15,8 +15,8 @@ public class ComplexObjectTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await client1.Send.SendToAll_ComplexObject(RandomComplexObject);
 
-        Assert.Equal(RandomComplexObject, (await messageFromClient1).Arg<ComplexObject>());
-        Assert.Equal(RandomComplexObject, (await messageFromClient2).Arg<ComplexObject>());
+        Assert.True(RandomComplexObject.IsEqualTo((await messageFromClient1).Arg<ComplexObject>()));
+        Assert.True(RandomComplexObject.IsEqualTo((await messageFromClient2).Arg<ComplexObject>()));
     }
 
     [RetryFact]
@@ -32,7 +32,7 @@ public class ComplexObjectTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await sender.Send.SendToConnection_ComplexObject(targetId, RandomComplexObject);
 
-        Assert.Equal(RandomComplexObject, (await messageFromTarget).Arg<ComplexObject>());
+        Assert.True(RandomComplexObject.IsEqualTo((await messageFromTarget).Arg<ComplexObject>()));
 
         await bystander.EnsureNoMessageAsync(nameof(IClient.Message));
     }
@@ -52,8 +52,8 @@ public class ComplexObjectTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await member1.Send.SendToAllInGroup_ComplexObject(GroupName, RandomComplexObject);
 
-        Assert.Equal(RandomComplexObject, (await messageFromMember1).Arg<ComplexObject>());
-        Assert.Equal(RandomComplexObject, (await messageFromMember2).Arg<ComplexObject>());
+        Assert.True(RandomComplexObject.IsEqualTo((await messageFromMember1).Arg<ComplexObject>()));
+        Assert.True(RandomComplexObject.IsEqualTo((await messageFromMember2).Arg<ComplexObject>()));
 
         await outsider.EnsureNoMessageAsync(nameof(IClient.Message));
     }
@@ -70,8 +70,8 @@ public class ComplexObjectTests(ContainerFixture fixture) : BaseTest(fixture)
 
         await user3.Send.SendToUsers_ComplexObject(["u1", "u2"], RandomComplexObject);
 
-        Assert.Equal(RandomComplexObject, (await messageFromUser1).Arg<ComplexObject>());
-        Assert.Equal(RandomComplexObject, (await messageFromUser2).Arg<ComplexObject>());
+        Assert.True(RandomComplexObject.IsEqualTo((await messageFromUser1).Arg<ComplexObject>()));
+        Assert.True(RandomComplexObject.IsEqualTo((await messageFromUser2).Arg<ComplexObject>()));
         await user3.EnsureNoMessageAsync(nameof(IClient.MessageComplexObject));
     }
 }
