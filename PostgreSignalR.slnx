@@ -6,6 +6,12 @@
   </Configurations>
 
   <Project Path="src/PostgreSignalR.csproj" />
+  <Folder Name="/Benchmarks/">
+    <File Path="benchmarks/docker-compose.yml" />
+    <Project Path="benchmarks/PostgreSignalR.Benchmarks.Abstractions/PostgreSignalR.Benchmarks.Abstractions.csproj" />
+    <Project Path="benchmarks/PostgreSignalR.Benchmarks.Server/PostgreSignalR.Benchmarks.Server.csproj" />
+    <Project Path="benchmarks/PostgreSignalR.Benchmarks/PostgreSignalR.Benchmarks.csproj" />
+  </Folder>
   
   <Folder Name="/Examples/">
     <Project Path="examples/PostgreSignalR.Examples.BasicSetup/PostgreSignalR.Examples.BasicSetup.csproj" />
