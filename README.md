@@ -107,7 +107,9 @@ Running the benchmarks on my hardware, the comparison between PostgreSignalR and
 ![StackExchangeRedis Benchmark](https://raw.githubusercontent.com/IanWold/PostgreSignalR/refs/heads/main/benchmarks/benchmark_stackexchangeredis.png)
 ![PostgreSignalR Benchmark](https://raw.githubusercontent.com/IanWold/PostgreSignalR/refs/heads/main/benchmarks/benchmark_postgresignalr.png)
 
-We can see that both backplanes begin to buckle at 1800 messages/second, and PostgreSignalR seems to have higher latency at the 99th percentile than Redis when the message load increases beyond this point.
+We can see that both backplanes begin to buckle at 1800 messages/second, and PostgreSignalR seems to have higher latency at the 99th percentile than Redis when the message load increases beyond this point. Importantly, perforamnce is relatively identical between the two (with the exception of PostgreSignalR's higher latency at the tail under heavier load) and no messages were lost in either run.
+
+This indicates to me that PostgreSignalR is a viable alternative to Redis as a backplane for SignalR and will behave well in typical scenarios.
 
 To stress again though - these results are with one particular configuration on one particular machine and almost certainly don't represent the performance you may see.
 
