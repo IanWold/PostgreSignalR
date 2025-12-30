@@ -6,7 +6,8 @@ using PostgreSignalR.Benchmarks;
 using HdrHistogram;
 using Microsoft.AspNetCore.SignalR.Client;
 
-static string Env(string key, string fallback) => Environment.GetEnvironmentVariable(key) ?? fallback;
+static string Env(string key, string fallback) =>
+    Environment.GetEnvironmentVariable(key) ?? fallback;
 
 var serverA = Env("SERVER_A", "http://servera:8080");
 var serverB = Env("SERVER_B", "http://serverb:8080");
@@ -57,35 +58,22 @@ for (int i = 0; i < clients; i++)
 {
     var connection = new HubConnectionBuilder().WithUrl(hubUrl).WithAutomaticReconnect().Build();
 
-    connection.On<Message>("bench", msg =>
+    connection.On<Message>("bench", message =>
     {
         if (!measuring)
         {
             return;
         }
 
-        if (!seen.TryAdd(msg.MessageId, 0))
+        if (!seen.TryAdd(message.MessageId, 0))
         {
             Interlocked.Increment(ref fanoutCopies.Value);
             return;
         }
 
-        var deltaMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - msg.SentUnixTimeMs;
-
-        var us = deltaMs * 1000;
-        if (us < 0)
-        {
-            us = 0;
-        }
-
-        if (us > 60000000)
-        {
-            us = 60000000;
-        }
-
         lock (histogram)
         {
-            histogram.RecordValue(us);
+            histogram.RecordValue(Math.Min(Math.Max((DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.SentUnixTimeMs) * 1000, 0), 60000000));
         }
     });
 
