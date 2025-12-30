@@ -109,6 +109,8 @@ Running the benchmarks on my hardware, the comparison between PostgreSignalR and
 
 We can see that both backplanes begin to buckle at 1800 messages/second, and PostgreSignalR seems to have higher latency at the 99th percentile than Redis when the message load increases beyond this point.
 
+To stress again though - these results are with one particular configuration on one particular machine and almost certainly don't represent the performance you may see.
+
 # Roadmap
 
 This library is brand-new, so while it should support all SignalR features it hasn't been thoroughly tested and vetted for production use. The immediate next steps are aimed at making this production-ready:
