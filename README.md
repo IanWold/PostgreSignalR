@@ -96,6 +96,19 @@ await app.InitializePostgresBackplanePayloadTableAsync();
 
 For more advanced use cases, PostgreSignalR allows you to create a custom payload strategy.
 
+# Benchmarks
+
+_Note: more benchmarks are TBD! I'm always happy to include help with benchmarking if you're good at benchmarks :)_
+
+The [benchmarks directory](https://github.com/IanWold/PostgreSignalR/tree/main/benchmarks) contains the benchmark code and instructions on how to run the benchmarks. Because benchmarks are incredibly hardware-dependent, and because variables might cause significant differences from the environment you're targeting, I'd encourage you to run the benchmarks with your own numbers to see if PostgreSignalR behaves appropriately for your use case.
+
+Running the benchmarks on my hardware, the comparison between PostgreSignalR and the Redis backplane are favorable. The benchmark tests end-to-end message latency under load. With 500 connections and 128 maximum concurrent requests from the test server:
+
+![StackExchangeRedis Benchmark](https://github.com/IanWold/PostgreSignalR/tree/main/benchmarks/benchmark_stackexchangeredis.png)
+1[PostgreSignalR Benchmark](https://github.com/IanWold/PostgreSignalR/tree/main/benchmarks/benchmark_postgresignalr.png)
+
+We can see that both backplanes begin to buckle at 1800 messages/second, and PostgreSignalR seems to have higher latency at the 99th percentile than Redis when the message load increases beyond this point.
+
 # Roadmap
 
 This library is brand-new, so while it should support all SignalR features it hasn't been thoroughly tested and vetted for production use. The immediate next steps are aimed at making this production-ready:
