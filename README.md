@@ -26,7 +26,7 @@ This is great, but what if [I really like Postgres](https://ian.wold.guru/Posts/
 
 Setting up the Postgres backplane for SignalR is very simple. If you've configured the [official Redis backplane](https://learn.microsoft.com/en-us/aspnet/core/signalr/redis-backplane?view=aspnetcore-10.0) before these steps will be quite simple.
 
-1. You'll need a Postgres server of course; deploy a new one or use your exisitng database
+1. You'll need a Postgres server of course; deploy a new one or use your existing database
 2. Install the [PostgreSignalR Nuget package](https://www.nuget.org/packages/PostgreSignalR) in your server project
 3. In your ASP setup logic, add the Postgres backplane to the service builder:
 
@@ -220,7 +220,7 @@ Sweep down:
 
 ![PostgreSignalR w/ Payload Table Benchmark](https://raw.githubusercontent.com/IanWold/PostgreSignalR/refs/heads/main/benchmarks/benchmark_postgresignalr_payloadtable.png)
 
-We can see that both backplanes begin to buckle at 1800 messages/second, and PostgreSignalR seems to have higher latency at the 99th percentile than Redis when the message load increases beyond this point. Importantly, perforamnce is relatively identical between the two (with the exception of PostgreSignalR's higher latency at the tail under heavier load) and no messages were lost in either run.
+We can see that both backplanes begin to buckle at 1800 messages/second, and PostgreSignalR seems to have higher latency at the 99th percentile than Redis when the message load increases beyond this point. Importantly, performance is relatively identical between the two (with the exception of PostgreSignalR's higher latency at the tail under heavier load) and no messages were lost in either run.
 
 This indicates to me that PostgreSignalR is a viable alternative to Redis as a backplane for SignalR and will behave well in typical scenarios.
 
@@ -292,6 +292,7 @@ Development should typically progress through: discussion, triaging into one or 
 * 💡 **New Features or Ideas** should start by opening a discussion instead of an issue. If that conversation results in wanting to move forward with the idea, one or more issues will be created that can then be taken on.
 
 When in doubt: ask a question! If you feel more comfortable you can also feel free to [reach me directly](https://ian.wold.guru/connect.html) for anything.
+
 
 
 
