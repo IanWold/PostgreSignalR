@@ -9,6 +9,9 @@ builder.Services.AddSignalR();
 
 var backplane = (Environment.GetEnvironmentVariable("BACKPLANE") ?? throw new Exception()).ToLowerInvariant();
 
+// Uncomment if running benchmarks with payload table
+//var instantiatePayloadTable = bool.Parse(Environment.GetEnvironmentVariable("MAKETABLE") ?? "false");
+
 if (backplane is "redis")
 {
     var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Redis") ?? throw new Exception();
@@ -18,9 +21,22 @@ else if (backplane is "postgres")
 {
     var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception();
     builder.Services.AddSignalR().AddPostgresBackplane(connectionString);
+    
+    // Uncomment if running benchmarks with payload table
+    // .AddBackplaneTablePayloadStrategy(o =>
+    // {
+    //     o.AutomaticCleanup = false;
+    //     o.StorageMode = PostgreSignalR.PostgresBackplanePayloadTableStorage.Always;
+    // });
 }
 
 var app = builder.Build();
+
+// Uncomment if running benchmarks with payload table
+// if (backplane is "postgres")
+// {
+//     await app.InitializePostgresBackplanePayloadTableAsync();
+// }
 
 app.MapHub<BenchmarkHub>("/hub");
 

@@ -218,9 +218,13 @@ Sweep down:
 
 ![PostgreSignalR Benchmark](https://raw.githubusercontent.com/IanWold/PostgreSignalR/refs/heads/main/benchmarks/benchmark_postgresignalr.png)
 
+![PostgreSignalR w/ Payload Table Benchmark](https://raw.githubusercontent.com/IanWold/PostgreSignalR/refs/heads/main/benchmarks/benchmark_postgresignalr_payloadtable.png)
+
 We can see that both backplanes begin to buckle at 1800 messages/second, and PostgreSignalR seems to have higher latency at the 99th percentile than Redis when the message load increases beyond this point. Importantly, perforamnce is relatively identical between the two (with the exception of PostgreSignalR's higher latency at the tail under heavier load) and no messages were lost in either run.
 
 This indicates to me that PostgreSignalR is a viable alternative to Redis as a backplane for SignalR and will behave well in typical scenarios.
+
+An unexpected result is that PostgreSignalR behaves much more consistently when using the payload table. Past 1800 messages/sec in these benchmarks it appears that the payload table would be preferred. YMMV of course!
 
 To stress again though - these results are with one particular configuration on one particular machine and almost certainly don't represent the performance you may see.
 
