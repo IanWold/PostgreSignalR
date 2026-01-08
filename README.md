@@ -236,14 +236,18 @@ This library is brand-new, so while it should support all SignalR features it ha
 2. Performance tests and benchmarks to optimize the code and find at-scale bugs
 3. Writing one or several example applications utilizing all of the SignalR features
 4. Adding additional configuration options to allow more flexibility in error handling
+5. Observe in production or production-like scenarios
 
-Right now the library has been released on Nuget in an alpha version, denoting that it is relatively untested _and_ the API may be subject to change. In this case, the "API" consists entirely of the dependency injection extensions and the `PostgresOptions` class. The beta, rc, and prod milestones will denote:
+Right now the library has been released on Nuget in a beta version, which I mean to be an indication that this is a viable product, though it requires more thorough testing and vetting in production scenarios. The API is still subject to change.
 
+* Alpha: The viability of the product is being tested, there are known major bugs
 * Beta: Testing has given confidence that this is a viable product and major bugs and performance issues have been resolved
 * RC: Further changes to the interface are unlikely and testing has indicated that the product is stable
 * Prod: The library is ready for use in production systems
 
 Alpha and beta versions will progress through `0.x.0-alpha` and `0.x.0-beta`, while the release candidates will start at `1.0.0-rc.x`. `1.0.0` will be the first production release.
+
+I'm liking at a relatively quick timeline through RC and prod, though I do only get so many hours to work on this. Contributions are welcome!
 
 # Developing and Testing
 
