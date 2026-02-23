@@ -72,7 +72,7 @@ public static class AspExtensions
     {
         signalrBuilder.Services.AddOptions<PostgresBackplaneOptions>().Configure(configure);
 
-        signalrBuilder.Services.AddSingleton<IPostgresBackplanePayloadStrategy, EventPayloadStrategy>();
+        signalrBuilder.Services.AddSingleton<IPayloadStrategy, EventPayloadStrategy>();
         signalrBuilder.Services.AddSingleton(typeof(HubLifetimeManager<>), typeof(PostgresHubLifetimeManager<>));
         
         return signalrBuilder;
@@ -92,11 +92,11 @@ public static class AspExtensions
     /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
     /// <param name="configure">A callback to configure the payload table options.</param>
     /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
-    public static ISignalRServerBuilder AddBackplaneTablePayloadStrategy(this ISignalRServerBuilder signalrBuilder, Action<PostgresBackplanePayloadTableOptions> configure)
+    public static ISignalRServerBuilder AddBackplaneTablePayloadStrategy(this ISignalRServerBuilder signalrBuilder, Action<PayloadTableOptions> configure)
     {
         signalrBuilder.Services.Configure(configure);
 
-        signalrBuilder.Services.AddSingleton<IPostgresBackplanePayloadStrategy, TablePayloadStrategy>();
+        signalrBuilder.Services.AddSingleton<IPayloadStrategy, TablePayloadStrategy>();
 
         return signalrBuilder;
     }
@@ -108,7 +108,7 @@ public static class AspExtensions
     /// <param name="ct">The optional <see cref="CancellationToken"/>.</param>
     public static async Task InitializePostgresBackplanePayloadTableAsync(this IApplicationBuilder builder, CancellationToken ct = default)
     {
-        var strategy = builder.ApplicationServices.GetRequiredService<IPostgresBackplanePayloadStrategy>();
+        var strategy = builder.ApplicationServices.GetRequiredService<IPayloadStrategy>();
 
         if (strategy is TablePayloadStrategy tableStrategy)
         {

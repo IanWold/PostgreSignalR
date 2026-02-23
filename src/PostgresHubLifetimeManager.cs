@@ -43,12 +43,12 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
     private readonly ConcurrentDictionary<string, Action<byte[]>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ClientResultsManager _clientResultsManager = new();
     private readonly PostgresListener _postgresListener;
-    private readonly IPostgresBackplanePayloadStrategy _payloadStrategy;
+    private readonly IPayloadStrategy _payloadStrategy;
     private int _internalAckId;
     private bool _isInitialized;
 
     public PostgresHubLifetimeManager(
-        IPostgresBackplanePayloadStrategy payloadStrategy,
+        IPayloadStrategy payloadStrategy,
         IHubProtocolResolver hubProtocolResolver,
         IOptions<PostgresBackplaneOptions> options,
         IOptions<HubOptions>? globalHubOptions,
