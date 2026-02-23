@@ -59,9 +59,18 @@ public static class AspExtensions
     /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
     /// <param name="configure">A callback to configure the Postgres options.</param>
     /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
-    public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, Action<PostgresBackplaneOptions> configure)
+    public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, Action<PostgresBackplaneOptions> configure) =>
+        AddPostgresBackplane(signalrBuilder, (o, _) => configure(o));
+
+    /// <summary>
+    /// Adds scale-out to a <see cref="ISignalRServerBuilder"/>, using a shared Postgres database.
+    /// </summary>
+    /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
+    /// <param name="configure">A callback to configure the Postgres options.</param>
+    /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
+    public static ISignalRServerBuilder AddPostgresBackplane(this ISignalRServerBuilder signalrBuilder, Action<PostgresBackplaneOptions, IServiceProvider> configure)
     {
-        signalrBuilder.Services.Configure(configure);
+        signalrBuilder.Services.AddOptions<PostgresBackplaneOptions>().Configure(configure);
 
         signalrBuilder.Services.AddSingleton<IPostgresBackplanePayloadStrategy, EventPayloadStrategy>();
         signalrBuilder.Services.AddSingleton(typeof(HubLifetimeManager<>), typeof(PostgresHubLifetimeManager<>));
