@@ -148,33 +148,6 @@ internal sealed class MemoryBufferWriter(int minimumSegmentSize = 4096) : IBuffe
         _position = 0;
     }
 
-    private async Task CopyToSlowAsync(Stream destination, CancellationToken cancellationToken)
-    {
-        if (_completedSegments != null)
-        {
-            // Copy full segments
-            var count = _completedSegments.Count;
-            for (var i = 0; i < count; i++)
-            {
-                var segment = _completedSegments[i];
-#if NETCOREAPP
-                await destination.WriteAsync(segment.Buffer.AsMemory(0, segment.Length), cancellationToken).ConfigureAwait(false);
-#else
-                await destination.WriteAsync(segment.Buffer, 0, segment.Length, cancellationToken).ConfigureAwait(false);
-#endif
-            }
-        }
-
-        if (_currentSegment is not null)
-        {
-#if NETCOREAPP
-            await destination.WriteAsync(_currentSegment.AsMemory(0, _position), cancellationToken).ConfigureAwait(false);
-#else
-            await destination.WriteAsync(_currentSegment, 0, _position, cancellationToken).ConfigureAwait(false);
-#endif
-        }
-    }
-
     public byte[] ToArray()
     {
         if (_currentSegment == null)
