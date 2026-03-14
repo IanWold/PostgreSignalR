@@ -618,17 +618,10 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
                 byte[] message;
                 try
                 {
-                    try
-                    {
-                        connection.Protocol.WriteMessage(completionMessage, memoryBufferWriter);
-                        message = PostgresProtocol.WriteCompletionMessage(memoryBufferWriter, protocolName);
-                    }
-                    finally
-                    {
-                        memoryBufferWriter.Dispose();
-                    }
-
-                    await PublishAsync(invocation.ReturnChannel!, message); // Ian: Why do we want to publish the message even if we got an exception writing it?
+                    connection.Protocol.WriteMessage(completionMessage, memoryBufferWriter);
+                    message = PostgresProtocol.WriteCompletionMessage(memoryBufferWriter, protocolName);
+                    
+                    await PublishAsync(invocation.ReturnChannel!, message);
                 }
                 catch (Exception ex)
                 {

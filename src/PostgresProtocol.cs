@@ -193,7 +193,7 @@ internal sealed class PostgresProtocol
         // * [A serialized Completion Message which is a 'bin']
         // Any additional items are discarded.
 
-        var completionMessage = writer.DetachAndReset();
+        using var completionMessage = writer.DetachAndReset();
         var msgPackWriter = new MessagePackWriter(writer);
 
         msgPackWriter.WriteArrayHeader(2);

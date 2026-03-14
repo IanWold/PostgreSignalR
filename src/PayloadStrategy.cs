@@ -146,7 +146,7 @@ public sealed class TablePayloadStrategy : IPayloadStrategy
 
         command.Parameters.Add(new("id", Convert.ToInt64(eventArgs.Payload[3..])));
 
-        var reader = command.ExecuteReader();
+        using var reader = command.ExecuteReader();
         reader.Read();
 
         var message = (byte[])reader[0];

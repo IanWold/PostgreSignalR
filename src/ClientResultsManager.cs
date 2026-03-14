@@ -110,7 +110,7 @@ internal sealed class ClientResultsManager : IInvocationBinder
     // Custom TCS type to avoid the extra allocation that would be introduced if we managed the cancellation separately
     // Also makes it easier to keep track of the CancellationTokenRegistration for disposal
     internal sealed class TaskCompletionSourceWithCancellation<T>(ClientResultsManager clientResultsManager, string connectionId, string invocationId, CancellationToken cancellationToken)
-        : TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously)
+        : TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously), IDisposable
     {
         private CancellationTokenRegistration _tokenRegistration;
 
@@ -120,6 +120,7 @@ internal sealed class ClientResultsManager : IInvocationBinder
         {
             if (cancellationToken.CanBeCanceled)
             {
+                _tokenRegistration.Dispose();
                 _tokenRegistration = cancellationToken.UnsafeRegister(static o => ((TaskCompletionSourceWithCancellation<T>)o!).SetCanceled(), this);
             }
         }
@@ -182,6 +183,11 @@ internal sealed class ClientResultsManager : IInvocationBinder
             return false;
         }
 #pragma warning restore IDE0060 // Remove unused parameter
+
+        public void Dispose()
+        {
+            _tokenRegistration.Dispose();
+        }
     }
 }
 #pragma warning restore CS8604 // Possible null reference argument.

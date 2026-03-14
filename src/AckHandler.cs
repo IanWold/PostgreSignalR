@@ -22,6 +22,8 @@ internal sealed class AckHandler : IDisposable
         _timer = CreateNonCapturingTimer(state => ((AckHandler)state!).CheckAcks(), state: this, dueTime: _ackInterval, period: _ackInterval);
     }
 
+#pragma warning disable IDISP004 // Copying ASP functionality
+//https://github.com/dotnet/aspnetcore/blob/f8410f812a2a76401468a78a4f776586c3af498c/src/Shared/NonCapturingTimer/NonCapturingTimer.cs
     static Timer CreateNonCapturingTimer(TimerCallback callback, object state, TimeSpan dueTime, TimeSpan period)
     {
         ArgumentNullException.ThrowIfNull(callback);
@@ -46,6 +48,7 @@ internal sealed class AckHandler : IDisposable
             }
         }
     }
+#pragma warning restore IDISP004
 
     public Task CreateAck(int id)
     {

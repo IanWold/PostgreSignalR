@@ -27,8 +27,7 @@ public class ContainerFixture : IAsyncLifetime
 
     public async Task<TestServerContainer> CreateTestServerAsync(DatabaseContainer database)
     {
-        var container = new ContainerBuilder()
-            .WithImage(TestServerImage)
+        var container = new ContainerBuilder(TestServerImage)
             .WithName($"signalr-test-{Guid.NewGuid():N}")
             .WithNetwork(Network)
             .WithEnvironment("ConnectionStrings__Postgres", database.ConnectionStringInternal)
@@ -61,8 +60,7 @@ public class ContainerFixture : IAsyncLifetime
 
         await TestServerImage.CreateAsync();
 
-        PostgresContainer = new PostgreSqlBuilder()
-            .WithImage("postgres:16")
+        PostgresContainer = new PostgreSqlBuilder("postgres:16")
             .WithUsername("postgres")
             .WithPassword("admin")
             .WithNetwork(Network)
