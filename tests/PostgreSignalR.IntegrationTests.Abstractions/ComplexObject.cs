@@ -8,7 +8,7 @@ public class ComplexObject
     public required List<SimpleObject> SimpleObjectsProperty { get; set; }
     public required Dictionary<string, SimpleObject> SimpleObjectsDictionaryProperty { get; set; }
 
-    public override bool Equals(object o) =>
+    public override bool Equals(object? o) =>
         o is ComplexObject c
         && c.SimpleObjectProperty == SimpleObjectProperty
         && c.SimpleObjectsProperty.SequenceEqual(SimpleObjectsProperty)

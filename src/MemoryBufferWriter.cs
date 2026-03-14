@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace PostgreSignalR;
 
-internal sealed class MemoryBufferWriter(int minimumSegmentSize = 4096) : Stream, IBufferWriter<byte>
+internal sealed class MemoryBufferWriter(int minimumSegmentSize = 4096) : IBufferWriter<byte>
 {
     [ThreadStatic]
     private static MemoryBufferWriter? _cachedInstance;
@@ -18,16 +18,6 @@ internal sealed class MemoryBufferWriter(int minimumSegmentSize = 4096) : Stream
     private List<CompletedBuffer>? _completedSegments;
     private byte[]? _currentSegment;
     private int _position;
-
-    public override long Length => _bytesWritten;
-    public override bool CanRead => false;
-    public override bool CanSeek => false;
-    public override bool CanWrite => true;
-    public override long Position
-    {
-        get => throw new NotSupportedException();
-        set => throw new NotSupportedException();
-    }
 
     public static MemoryBufferWriter Get()
     {
@@ -118,11 +108,6 @@ internal sealed class MemoryBufferWriter(int minimumSegmentSize = 4096) : Stream
 
         destination.Write(_currentSegment.AsSpan(0, _position));
     }
-
-    public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken) =>
-        _completedSegments is null && _currentSegment is not null
-            ? destination.WriteAsync(_currentSegment, 0, _position, cancellationToken)
-            : CopyToSlowAsync(destination, cancellationToken);
 
     [MemberNotNull(nameof(_currentSegment))]
     private void EnsureCapacity(int sizeHint)
@@ -248,59 +233,6 @@ internal sealed class MemoryBufferWriter(int minimumSegmentSize = 4096) : Stream
         Debug.Assert(_bytesWritten == totalWritten + _position);
     }
 
-    public override void Flush() { }
-    public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-    public override void SetLength(long value) => throw new NotSupportedException();
-
-    public override void WriteByte(byte value)
-    {
-        if (_currentSegment != null && (uint)_position < (uint)_currentSegment.Length)
-        {
-            _currentSegment[_position] = value;
-        }
-        else
-        {
-            AddSegment();
-            _currentSegment[0] = value;
-        }
-
-        _position++;
-        _bytesWritten++;
-    }
-
-    public override void Write(byte[] buffer, int offset, int count)
-    {
-        var position = _position;
-        if (_currentSegment != null && position < _currentSegment.Length - count)
-        {
-            Buffer.BlockCopy(buffer, offset, _currentSegment, position, count);
-
-            _position = position + count;
-            _bytesWritten += count;
-        }
-        else
-        {
-            BuffersExtensions.Write(this, buffer.AsSpan(offset, count));
-        }
-    }
-
-#if NETCOREAPP
-    public override void Write(ReadOnlySpan<byte> span)
-    {
-        if (_currentSegment != null && span.TryCopyTo(_currentSegment.AsSpan(_position)))
-        {
-            _position += span.Length;
-            _bytesWritten += span.Length;
-        }
-        else
-        {
-            BuffersExtensions.Write(this, span);
-        }
-    }
-#endif
-
     public WrittenBuffers DetachAndReset()
     {
         _completedSegments ??= [];
@@ -318,14 +250,6 @@ internal sealed class MemoryBufferWriter(int minimumSegmentSize = 4096) : Stream
         _position = 0;
 
         return written;
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            Reset();
-        }
     }
 
     /// <summary>
