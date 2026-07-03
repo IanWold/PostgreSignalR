@@ -129,4 +129,11 @@ internal static partial class LogExtensions
         Message = "Postgres backplane configuration is invalid: {Message}"
     )]
     public static partial void BackplaneConfigurationInvalid(this ILogger logger, string message);
+
+    [LoggerMessage(
+        EventId = 180,
+        Level = LogLevel.Error,
+        Message = "Postgres backplane failed to resolve the payload for notification on channel {Channel}."
+    )]
+    public static partial void BackplaneFailedResolvingPayload(this ILogger logger, string channel, Exception exception);
 }

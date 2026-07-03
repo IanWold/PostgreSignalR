@@ -52,7 +52,8 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
                         }
                         catch
                         {
-                            await ReconnectAsync(_cts.Token);
+                            await ReconnectCoreAsync(_cts.Token);
+                            connection = _connection!;
                         }
                     }
                 }
@@ -76,32 +77,37 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
 
         try
         {
-            try
-            {
-                if (_connection is not null)
-                {
-                    await _connection.CloseAsync();
-                }
-            }
-            catch { }
-
-            _connection?.Dispose();
-
-            _connection = await dataSource.OpenConnectionAsync(ct);
-            
-            _connection.Notification += (_, e) => OnNotification?.Invoke(this, e);
-
-            if (_channels.Count > 0)
-            {
-                await ExecAsync(BuildListenSql(_channels), ct);
-            }
-
-            _waitCts.Cancel();
+            await ReconnectCoreAsync(ct);
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    private async Task ReconnectCoreAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (_connection is not null)
+            {
+                await _connection.CloseAsync();
+            }
+        }
+        catch { }
+
+        _connection?.Dispose();
+
+        _connection = await dataSource.OpenConnectionAsync(ct);
+
+        _connection.Notification += (_, e) => OnNotification?.Invoke(this, e);
+
+        if (_channels.Count > 0)
+        {
+            await ExecAsync(BuildListenSql(_channels), ct);
+        }
+
+        _waitCts.Cancel();
     }
 
     private static string BuildListenSql(IEnumerable<string> channels)
