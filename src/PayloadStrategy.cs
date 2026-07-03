@@ -141,13 +141,18 @@ public sealed class TablePayloadStrategy : IPayloadStrategy
             }
         }
 
+        var id = Convert.ToInt64(eventArgs.Payload[3..]);
+
         using var connection = _backplaneOptions.Value.DataSource.OpenConnection();
         using var command = new NpgsqlCommand(_readQuery, connection);
 
-        command.Parameters.Add(new("id", Convert.ToInt64(eventArgs.Payload[3..])));
+        command.Parameters.Add(new("id", id));
 
         using var reader = command.ExecuteReader();
-        reader.Read();
+        if (!reader.Read())
+        {
+            throw new InvalidOperationException($"Payload record {id} was not found in {_tableName}. It may have been removed by automatic cleanup before it could be read; consider increasing AutomaticCleanupTtlMs.");
+        }
 
         var message = (byte[])reader[0];
         return message;

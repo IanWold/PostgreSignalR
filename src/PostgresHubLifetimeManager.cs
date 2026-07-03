@@ -781,7 +781,18 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         _logger.BackplaneReadNotification(e.Channel);
         if (_notificationHandlers.TryGetValue(e.Channel, out var handler))
         {
-            handler(_payloadStrategy.ResolveNotificationPayload(e));
+            byte[] payload;
+            try
+            {
+                payload = _payloadStrategy.ResolveNotificationPayload(e);
+            }
+            catch (Exception ex)
+            {
+                _logger.BackplaneFailedResolvingPayload(e.Channel, ex);
+                return;
+            }
+
+            handler(payload);
         }
     }
 

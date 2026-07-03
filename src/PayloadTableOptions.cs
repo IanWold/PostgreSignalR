@@ -61,7 +61,7 @@ public class PayloadTableOptions
     /// The minimum TTL of a payload record in the table in milliseconds.
     /// Default: <c>300000</c> (5 minutes)
     /// </summary>
-    public int AutomaticCleanupTtlMs { get; set; } = 1000;
+    public int AutomaticCleanupTtlMs { get; set; } = 300000;
 
     /// <summary>
     /// The interval between cleanups in milliseconds.
