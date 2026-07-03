@@ -39,7 +39,10 @@ public sealed class EventPayloadStrategy(IOptions<PostgresBackplaneOptions> opti
     public async Task NotifyAsync(string channelName, byte[] message, CancellationToken ct = default)
     {
         using var connection = await options.Value.DataSource.OpenConnectionAsync(ct);
-        using var command = new NpgsqlCommand($"NOTIFY {channelName.EscapeQutoes()}, '{Convert.ToBase64String(message)}';", connection);
+        using var command = new NpgsqlCommand("SELECT pg_notify(@channelName, @payload);", connection);
+
+        command.Parameters.Add(new("channelName", channelName.EscapeQuotes()));
+        command.Parameters.Add(new("payload", Convert.ToBase64String(message)));
 
         await command.ExecuteNonQueryAsync(ct);
     }
@@ -84,14 +87,18 @@ public sealed class TablePayloadStrategy : IPayloadStrategy
         }
     }
 
-    private void CleanupIds(object? sender, ElapsedEventArgs e)
+    private async void CleanupIds(object? sender, ElapsedEventArgs e)
     {
-        using var connection = _backplaneOptions.Value.DataSource.OpenConnection();
-        using var transaction = connection.BeginTransaction();
-        using var command = new NpgsqlCommand(_cleanupQuery, connection, transaction);
+        try
+        {
+            await using var connection = await _backplaneOptions.Value.DataSource.OpenConnectionAsync();
+            await using var transaction = await connection.BeginTransactionAsync();
+            await using var command = new NpgsqlCommand(_cleanupQuery, connection, transaction);
 
-        command.ExecuteNonQuery();
-        transaction.Commit();
+            await command.ExecuteNonQueryAsync();
+            await transaction.CommitAsync();
+        }
+        catch { }
     }
 
     /// <inheritdoc/>
@@ -120,7 +127,7 @@ public sealed class TablePayloadStrategy : IPayloadStrategy
         using var command = new NpgsqlCommand(query, connection, transaction);
 
         command.Parameters.Add(new("payload", message) { NpgsqlDbType = NpgsqlDbType.Bytea });
-        command.Parameters.Add(new("channelName", channelName.Replace("\"", "\"\"")));
+        command.Parameters.Add(new("channelName", channelName.EscapeQuotes()));
 
         await command.ExecuteNonQueryAsync(ct);
         await transaction.CommitAsync(ct);

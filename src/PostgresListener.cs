@@ -115,7 +115,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
         var sb = new StringBuilder();
         foreach (var channel in channels)
         {
-            sb.Append("LISTEN ").Append(channel.EscapeQutoes()).Append(';');
+            sb.Append("LISTEN ").Append(channel.EscapeQuotes()).Append(';');
         }
 
         return sb.ToString();
@@ -186,7 +186,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
 
             _operations.Enqueue(async (conn, tok) =>
             {
-                await ExecAsync($"LISTEN {channel.EscapeQutoes()};", tok, conn);
+                await ExecAsync($"LISTEN {channel.EscapeQuotes()};", tok, conn);
             });
 
             _waitCts.Cancel();
@@ -211,7 +211,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
 
             _operations.Enqueue(async (conn, tok) =>
             {
-                await ExecAsync($"UNLISTEN {channel.EscapeQutoes()};", tok, conn);
+                await ExecAsync($"UNLISTEN {channel.EscapeQuotes()};", tok, conn);
             });
 
             _waitCts.Cancel();
