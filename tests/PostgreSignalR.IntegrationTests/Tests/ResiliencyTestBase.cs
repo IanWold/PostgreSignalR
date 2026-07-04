@@ -30,7 +30,22 @@ public abstract class ResiliencyTestBase(ContainerFixture fixture, BackplaneTest
         return terminatedCount;
     }
 
-    protected static async Task AssertEventuallyDeliveredAsync(TestClient sender, TestClient receiver, TimeSpan? timeout = null)
+    protected static Task AssertEventuallyDeliveredAsync(TestClient sender, TestClient receiver, TimeSpan? timeout = null) =>
+        AssertEventuallyDeliveredAsync(() => sender.Send.SendToAll(Guid.NewGuid().ToString()), receiver, nameof(IClient.Message), timeout);
+
+    protected static Task AssertEventuallyDeliveredAsync(Func<Task> sendAction, TestClient receiver, string messageKey, TimeSpan? timeout = null) =>
+        AssertEventuallySucceedsAsync(
+            async () =>
+            {
+                var message = receiver.ExpectMessageAsync(messageKey, TimeSpan.FromSeconds(2));
+
+                await sendAction();
+                await message;
+            },
+            timeout
+        );
+
+    protected static async Task AssertEventuallySucceedsAsync(Func<Task> action, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
         Exception? lastFailure = null;
@@ -39,11 +54,7 @@ public abstract class ResiliencyTestBase(ContainerFixture fixture, BackplaneTest
         {
             try
             {
-                var message = receiver.ExpectMessageAsync(nameof(IClient.Message), TimeSpan.FromSeconds(2));
-                
-                await sender.Send.SendToAll(Guid.NewGuid().ToString());
-                await message;
-
+                await action();
                 return;
             }
             catch (Exception ex)
