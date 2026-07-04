@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Text;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -91,24 +92,46 @@ internal sealed class TruncatingChannelNameProvider(string prefix, string return
 
 internal sealed class HashingChannelNameProvider(string prefix, string returnServerName) : ChannelNameProvider(returnServerName)
 {
+    // Below this many UTF-8 bytes we encode on the stack;
+    // names larger than this are rented from the array pool to never risk overflowing a fixed-size stack buffer
+    private const int StackallocThreshold = 256;
+
     internal override string Normalize(string name)
     {
-        Span<byte> utf8 = stackalloc byte[1024];
-        var utf8Length = Encoding.UTF8.GetBytes(name.AsSpan(), utf8);
+        var maxByteCount = Encoding.UTF8.GetMaxByteCount(name.Length);
+        var rented = maxByteCount > StackallocThreshold
+            ? ArrayPool<byte>.Shared.Rent(maxByteCount)
+            : null;
 
-        Span<byte> hash = stackalloc byte[32];
-        SHA256.HashData(utf8[..utf8Length], hash);
-
-        Span<byte> base64 = stackalloc byte[44];
-        Base64.EncodeToUtf8(hash, base64, out _, out var written);
-
-        return prefix + string.Create(written-1, base64.ToArray(), static (destination, source) =>
+        try
         {
-            for (int i = 0; i < destination.Length; i++)
+            Span<byte> utf8 = rented is not null
+                ? rented
+                : stackalloc byte[StackallocThreshold];
+            
+            var utf8Length = Encoding.UTF8.GetBytes(name.AsSpan(), utf8);
+
+            Span<byte> hash = stackalloc byte[32];
+            SHA256.HashData(utf8[..utf8Length], hash);
+
+            Span<byte> base64 = stackalloc byte[44];
+            Base64.EncodeToUtf8(hash, base64, out _, out var written);
+
+            return prefix + string.Create(written-1, base64.ToArray(), static (destination, source) =>
             {
-                var c = source[i];
-                destination[i] = c == (byte)'+' || c == (byte)'/' ? '_' : (char)c;
+                for (int i = 0; i < destination.Length; i++)
+                {
+                    var c = source[i];
+                    destination[i] = c == (byte)'+' || c == (byte)'/' ? '_' : (char)c;
+                }
+            });
+        }
+        finally
+        {
+            if (rented is not null)
+            {
+                ArrayPool<byte>.Shared.Return(rented);
             }
-        });
+        }
     }
 }

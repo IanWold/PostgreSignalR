@@ -79,6 +79,10 @@ public class PostgresBackplaneOptions
         {
             message = "Prefix must be less than 20 characters.";
         }
+        else if (DataSource is null)
+        {
+            message = "DataSource must be configured.";
+        }
 
         return message is null;
     }
