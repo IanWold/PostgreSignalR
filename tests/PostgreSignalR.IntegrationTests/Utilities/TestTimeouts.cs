@@ -8,4 +8,5 @@ internal static class TestTimeouts
     public const int HealthCheckMaxAttempts = 120;
     public static readonly TimeSpan HealthCheckPollInterval = TimeSpan.FromMilliseconds(50);
     public static readonly TimeSpan NegativeAssertionTimeout = TimeSpan.FromMilliseconds(250);
+    public static readonly TimeSpan RetryAttemptTimeout = TimeSpan.FromSeconds(5);
 }

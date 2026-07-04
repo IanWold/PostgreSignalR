@@ -45,16 +45,25 @@ public abstract class ResiliencyTestBase(ContainerFixture fixture, BackplaneTest
             timeout
         );
 
-    protected static async Task AssertEventuallySucceedsAsync(Func<Task> action, TimeSpan? timeout = null)
+    protected static async Task AssertEventuallySucceedsAsync(Func<Task> action, TimeSpan? timeout = null, TimeSpan? perAttemptTimeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
+        var attemptTimeout = perAttemptTimeout ?? TestTimeouts.RetryAttemptTimeout;
         Exception? lastFailure = null;
 
         while (DateTime.UtcNow < deadline)
         {
             try
             {
-                await action();
+                var attempt = action();
+                var winner = await Task.WhenAny(attempt, Task.Delay(attemptTimeout));
+
+                if (winner != attempt)
+                {
+                    throw new TimeoutException($"Attempt did not complete within {attemptTimeout}.");
+                }
+
+                await attempt;
                 return;
             }
             catch (Exception ex)
