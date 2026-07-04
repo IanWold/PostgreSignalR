@@ -1,6 +1,6 @@
 namespace PostgreSignalR.IntegrationTests;
 
-public class InvokeAndStreamingTests(ContainerFixture fixture) : BaseTest(fixture)
+public class ClientReturnTests(ContainerFixture fixture) : BaseTest(fixture)
 {
     [RetryFact]
     public async Task Invoke_ReturnsAcrossServers()

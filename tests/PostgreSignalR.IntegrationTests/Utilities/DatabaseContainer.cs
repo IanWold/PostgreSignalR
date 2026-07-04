@@ -28,7 +28,7 @@ public class DatabaseContainer(string connectionString) : IAsyncLifetime
         await connection.OpenAsync();
 
         await using var createDatabaseCommand = connection.CreateCommand();
-        createDatabaseCommand.CommandText = $"CREATE DATABASE \"{_uniqueName}\";";
+        createDatabaseCommand.CommandText = $"CREATE DATABASE {EscapeIdentifier(_uniqueName)};";
         await createDatabaseCommand.ExecuteNonQueryAsync();
     }
 
@@ -37,14 +37,18 @@ public class DatabaseContainer(string connectionString) : IAsyncLifetime
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
 
-        await using (var terminateBackendCommand = new NpgsqlCommand($"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{_uniqueName}';", connection))
+        await using (var terminateBackendCommand = new NpgsqlCommand("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = @databaseName;", connection))
         {
+            terminateBackendCommand.Parameters.Add(new("databaseName", _uniqueName));
             await terminateBackendCommand.ExecuteNonQueryAsync();
         }
 
-        await using var dropDatabaseCommand = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_uniqueName}\";", connection);
+        await using var dropDatabaseCommand = new NpgsqlCommand($"DROP DATABASE IF EXISTS {EscapeIdentifier(_uniqueName)};", connection);
         await dropDatabaseCommand.ExecuteNonQueryAsync();
 
         GC.SuppressFinalize(this);
     }
+
+    private static string EscapeIdentifier(string identifier) =>
+        "\"" + identifier.Replace("\"", "\"\"") + "\"";
 }
