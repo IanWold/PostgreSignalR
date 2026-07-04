@@ -70,6 +70,21 @@ public class ContainerFixture : IAsyncLifetime
         return (pair.Server1, pair.Server2);
     }
 
+    /// <summary>
+    /// Gets the connection string for the database backing <paramref name="configuration"/>'s server pair,
+    /// for tests that need to inspect backplane-managed state (e.g. the payload table) directly.
+    /// </summary>
+    public async Task<string> GetDatabaseConnectionStringAsync(BackplaneTestConfiguration configuration)
+    {
+        if (configuration == BackplaneTestConfiguration.Default)
+        {
+            return SharedDatabse!.ConnectionString;
+        }
+
+        var pair = await _configuredServerPairs.GetOrAdd(configuration, CreateConfiguredServerPairAsync);
+        return pair.Database.ConnectionString;
+    }
+
     private async Task<ConfiguredServerPair> CreateConfiguredServerPairAsync(BackplaneTestConfiguration configuration)
     {
         var database = await GetDatabaseAsync();

@@ -9,7 +9,9 @@ public sealed record BackplaneTestConfiguration(
     string? Prefix = null,
     ChannelNameNormaization? ChannelNameNormaization = null,
     bool UseTableStrategy = true,
-    PayloadTableStorage? PayloadTableStorage = null
+    PayloadTableStorage? PayloadTableStorage = null,
+    int? AutomaticCleanupTtlMs = null,
+    int? AutomaticCleanupIntervalMs = null
 )
 {
     public static BackplaneTestConfiguration Default { get; } = new();
@@ -34,6 +36,16 @@ public sealed record BackplaneTestConfiguration(
         if (PayloadTableStorage is not null)
         {
             environment["PayloadTable__StorageMode"] = PayloadTableStorage.Value.ToString();
+        }
+
+        if (AutomaticCleanupTtlMs is not null)
+        {
+            environment["PayloadTable__AutomaticCleanupTtlMs"] = AutomaticCleanupTtlMs.Value.ToString();
+        }
+
+        if (AutomaticCleanupIntervalMs is not null)
+        {
+            environment["PayloadTable__AutomaticCleanupIntervalMs"] = AutomaticCleanupIntervalMs.Value.ToString();
         }
 
         return environment;
