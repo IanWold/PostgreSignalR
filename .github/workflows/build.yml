@@ -22,5 +22,12 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Test
-      run: dotnet test PostgreSignalR.slnx --no-build --verbosity normal -m:1 -- --stop-on-fail on
+      run: dotnet test PostgreSignalR.slnx --no-build --verbosity normal -m:1 --results-directory ./TestResults --blame-hang --blame-hang-timeout 2m --blame-hang-dump-type mini -- --stop-on-fail on
       timeout-minutes: 10
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: ./TestResults
+        retention-days: 5
