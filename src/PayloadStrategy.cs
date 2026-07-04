@@ -41,7 +41,7 @@ public sealed class EventPayloadStrategy(IOptions<PostgresBackplaneOptions> opti
         using var connection = await options.Value.DataSource.OpenConnectionAsync(ct);
         using var command = new NpgsqlCommand("SELECT pg_notify(@channelName, @payload);", connection);
 
-        command.Parameters.Add(new("channelName", channelName.EscapeQuotes()));
+        command.Parameters.Add(new("channelName", channelName));
         command.Parameters.Add(new("payload", Convert.ToBase64String(message)));
 
         await command.ExecuteNonQueryAsync(ct);
@@ -127,7 +127,7 @@ public sealed class TablePayloadStrategy : IPayloadStrategy
         using var command = new NpgsqlCommand(query, connection, transaction);
 
         command.Parameters.Add(new("payload", message) { NpgsqlDbType = NpgsqlDbType.Bytea });
-        command.Parameters.Add(new("channelName", channelName.Replace("\"", "\"\"")));
+        command.Parameters.Add(new("channelName", channelName));
 
         await command.ExecuteNonQueryAsync(ct);
         await transaction.CommitAsync(ct);
