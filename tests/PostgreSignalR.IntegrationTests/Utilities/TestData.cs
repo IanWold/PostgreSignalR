@@ -2,7 +2,7 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public abstract class TestData
+public abstract class TestData : IAsyncLifetime
 {
     internal string GroupName { get; } = Guid.NewGuid().ToString();
     internal string ShortMessage { get; } = Guid.NewGuid().ToString();
@@ -25,4 +25,10 @@ public abstract class TestData
         Random.Shared.Next(0, 100),
         Guid.NewGuid().ToString()
     );
+
+    public virtual ValueTask InitializeAsync() =>
+        default;
+
+    public virtual async ValueTask DisposeAsync() =>
+        await Task.Delay(TestTimeouts.DisconnectSettleDelay);
 }

@@ -74,7 +74,7 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
         var queue = _waiters.GetOrAdd(key, _ => new ConcurrentQueue<TaskCompletionSource<ClientMessage>>());
         queue.Enqueue(waiter);
 
-        var cts = new CancellationTokenSource(timeout ?? TimeSpan.FromSeconds(1));
+        var cts = new CancellationTokenSource(timeout ?? TestTimeouts.DefaultMessageTimeout);
         var registration = cts.Token.Register(() => waiter.TrySetCanceled(cts.Token));
 
         return AwaitAndCleanupAsync(waiter.Task, cts, registration);
@@ -97,7 +97,7 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
     {
         try
         {
-            await ExpectMessageAsync(key, timeout ?? TimeSpan.FromMilliseconds(250));
+            await ExpectMessageAsync(key, timeout ?? TestTimeouts.NegativeAssertionTimeout);
             throw new Xunit.Sdk.XunitException($"Unexpected message for key '{key}'.");
         }
         catch (TaskCanceledException)
