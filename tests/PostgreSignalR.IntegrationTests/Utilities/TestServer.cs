@@ -6,26 +6,39 @@ public class TestServer(TestServerContainer container) : IAsyncDisposable
     {
         var client = await TestClient.CreateAsync(container.HubUri, user);
 
-        using var httpClient = new HttpClient();
-        var isReady = false;
-
-        for (var i = 0; i < 120; i++)
+        try
         {
-            try
+            using var httpClient = new HttpClient();
+            var isReady = false;
+
+            for (var i = 0; i < TestTimeouts.HealthCheckMaxAttempts; i++)
             {
-                using var response = await httpClient.GetAsync(container.HealthUri);
-                if (response.IsSuccessStatusCode)
+                try
                 {
-                    isReady = true;
-                    break;
+                    using var response = await httpClient.GetAsync(container.HealthUri);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        isReady = true;
+                        break;
+                    }
                 }
+                catch { }
+
+                await Task.Delay(TestTimeouts.HealthCheckPollInterval);
             }
-            catch { }
 
-            await Task.Delay(50);
+            if (!isReady)
+            {
+                throw new TimeoutException("Health check did not report ready.");
+            }
+
+            return client;
         }
-
-        return isReady ? client : throw new TimeoutException($"Health check did not report ready.");
+        catch
+        {
+            await client.DisposeAsync();
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()

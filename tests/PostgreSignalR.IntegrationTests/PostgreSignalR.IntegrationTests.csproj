@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PostgreSignalR.IntegrationTests.Abstractions\PostgreSignalR.IntegrationTests.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\PostgreSignalR.csproj" />
   </ItemGroup>
   
   <ItemGroup>

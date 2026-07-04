@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Images;
 using DotNet.Testcontainers.Networks;
@@ -18,6 +19,10 @@ public class ContainerFixture : IAsyncLifetime
     public TestServer? SharedServer1 { get; set; }
     public TestServer? SharedServer2 { get; set; }
 
+    // Non-default configurations are provisioned lazily on first request and cached for the remainder of the
+    // test run, keyed by value so every test asking for the same configuration reuses the same server pair.
+    private readonly ConcurrentDictionary<BackplaneTestConfiguration, Task<ConfiguredServerPair>> _configuredServerPairs = new();
+
     public async Task<DatabaseContainer> GetDatabaseAsync()
     {
         var database = new DatabaseContainer(PostgresContainer!.GetConnectionString());
@@ -25,18 +30,55 @@ public class ContainerFixture : IAsyncLifetime
         return database;
     }
 
-    public async Task<TestServerContainer> CreateTestServerAsync(DatabaseContainer database)
+    public async Task<TestServerContainer> CreateTestServerAsync(DatabaseContainer database, IReadOnlyDictionary<string, string>? environment = null)
     {
-        var container = new ContainerBuilder(TestServerImage)
+        var containerBuilder = new ContainerBuilder(TestServerImage)
             .WithName($"signalr-test-{Guid.NewGuid():N}")
             .WithNetwork(Network)
             .WithEnvironment("ConnectionStrings__Postgres", database.ConnectionStringInternal)
             .WithPortBinding(8080, assignRandomHostPort: true)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8080))
-            .Build();
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8080));
+
+        if (environment is not null)
+        {
+            foreach (var (key, value) in environment)
+            {
+                containerBuilder = containerBuilder.WithEnvironment(key, value);
+            }
+        }
+
+        var container = containerBuilder.Build();
 
         await container.StartAsync();
         return new TestServerContainer(container);
+    }
+
+    /// <summary>
+    /// Gets a server pair configured per <paramref name="configuration"/>. The default configuration returns
+    /// the two servers shared by the whole test run; any other configuration is provisioned on its own
+    /// database and pair of app containers (built from the same shared image, just with different
+    /// environment variables), created once on first request and reused afterward.
+    /// </summary>
+    public Task<(TestServer Server1, TestServer Server2)> GetServerPairAsync(BackplaneTestConfiguration configuration) =>
+        configuration == BackplaneTestConfiguration.Default
+            ? Task.FromResult((SharedServer1!, SharedServer2!))
+            : GetOrCreateConfiguredPairAsync(configuration);
+
+    private async Task<(TestServer, TestServer)> GetOrCreateConfiguredPairAsync(BackplaneTestConfiguration configuration)
+    {
+        var pair = await _configuredServerPairs.GetOrAdd(configuration, CreateConfiguredServerPairAsync);
+        return (pair.Server1, pair.Server2);
+    }
+
+    private async Task<ConfiguredServerPair> CreateConfiguredServerPairAsync(BackplaneTestConfiguration configuration)
+    {
+        var database = await GetDatabaseAsync();
+        var environment = configuration.ToEnvironmentVariables();
+
+        var server1 = new TestServer(await CreateTestServerAsync(database, environment));
+        var server2 = new TestServer(await CreateTestServerAsync(database, environment));
+
+        return new ConfiguredServerPair(database, server1, server2);
     }
 
     public async ValueTask InitializeAsync()
@@ -78,9 +120,18 @@ public class ContainerFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        await SharedDatabse!.DisposeAsync();
+        // Stop app servers before dropping the databases they're connected to, rather than the reverse.
         await SharedServer1!.DisposeAsync();
         await SharedServer2!.DisposeAsync();
+        await SharedDatabse!.DisposeAsync();
+
+        foreach (var pairTask in _configuredServerPairs.Values)
+        {
+            var pair = await pairTask;
+            await pair.Server1.DisposeAsync();
+            await pair.Server2.DisposeAsync();
+            await pair.Database.DisposeAsync();
+        }
 
         await Network!.DisposeAsync();
         await TestServerImage!.DisposeAsync();
@@ -88,4 +139,6 @@ public class ContainerFixture : IAsyncLifetime
 
         GC.SuppressFinalize(this);
     }
+
+    private sealed record ConfiguredServerPair(DatabaseContainer Database, TestServer Server1, TestServer Server2);
 }

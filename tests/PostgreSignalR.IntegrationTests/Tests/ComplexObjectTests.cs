@@ -1,6 +1,6 @@
 using PostgreSignalR.IntegrationTests.Abstractions;
 
-namespace PostgreSignalR.IntegrationTests.Tests;
+namespace PostgreSignalR.IntegrationTests;
 
 public class ComplexObjectTests(ContainerFixture fixture) : BaseTest(fixture)
 {
