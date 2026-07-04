@@ -9,7 +9,20 @@ public class ClientReturnTests(ContainerFixture fixture) : BaseTest(fixture)
         await using var callee = await Server2.CreateClientAsync();
 
         var calleeId = await callee.Send.GetConnectionId();
-        
+
+        var result = await caller.Send.InvokeConnectionEcho(calleeId, ShortMessage);
+
+        Assert.Equal($"echo:{ShortMessage}", result);
+    }
+
+    [RetryFact]
+    public async Task Invoke_ReturnsWithinSameServer()
+    {
+        await using var caller = await Server1.CreateClientAsync();
+        await using var callee = await Server1.CreateClientAsync();
+
+        var calleeId = await callee.Send.GetConnectionId();
+
         var result = await caller.Send.InvokeConnectionEcho(calleeId, ShortMessage);
 
         Assert.Equal($"echo:{ShortMessage}", result);

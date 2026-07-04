@@ -5,10 +5,10 @@ namespace PostgreSignalR.IntegrationTests;
 public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
 {
     [RetryFact]
-    public async Task Connection_TargetsSingleConnection()
+    public async Task Connection_TargetsSingleConnection_SameServer()
     {
         await using var sender = await Server1.CreateClientAsync();
-        await using var target = await Server2.CreateClientAsync();
+        await using var target = await Server1.CreateClientAsync();
         await using var bystander = await Server2.CreateClientAsync();
 
         var targetId = await target.Send.GetConnectionId();
