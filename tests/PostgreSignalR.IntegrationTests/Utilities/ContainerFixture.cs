@@ -24,7 +24,7 @@ public class ContainerFixture : IAsyncLifetime
 
     public async Task<DatabaseContainer> GetDatabaseAsync()
     {
-        var database = new DatabaseContainer(PostgresContainer!.GetConnectionString());
+        var database = new DatabaseContainer(() => PostgresContainer!.GetConnectionString());
         await database.InitializeAsync();
         return database;
     }

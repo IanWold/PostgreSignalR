@@ -1,14 +1,18 @@
 using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;
-using Testcontainers.PostgreSql;
+using Npgsql;
 
 namespace PostgreSignalR.IntegrationTests;
 
 public class PostgresRestartFixture(ContainerFixture containerFixture) : IAsyncLifetime
 {
-    private INetwork? _network;
+    private const string PostgresUser = "postgres";
+    private const string PostgresPassword = "admin";
 
-    public PostgreSqlContainer? PostgresContainer { get; private set; }
+    private INetwork? _network;
+    private IContainer? _postgresContainer;
+
     public DatabaseContainer? Database { get; private set; }
     public TestServer? Server1 { get; private set; }
     public TestServer? Server2 { get; private set; }
@@ -21,22 +25,46 @@ public class PostgresRestartFixture(ContainerFixture containerFixture) : IAsyncL
 
         await _network.CreateAsync();
 
-        PostgresContainer = new PostgreSqlBuilder("postgres:16")
-            .WithUsername("postgres")
-            .WithPassword("admin")
+        _postgresContainer = new ContainerBuilder("postgres:16")
             .WithNetwork(_network)
             .WithNetworkAliases("postgres_network")
-            .WithCleanUp(true)
-            .WithAutoRemove(true)
+            .WithEnvironment("POSTGRES_USER", PostgresUser)
+            .WithEnvironment("POSTGRES_PASSWORD", PostgresPassword)
+            .WithPortBinding(5432, assignRandomHostPort: true)
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(5432))
             .Build();
 
-        await PostgresContainer.StartAsync();
+        await _postgresContainer.StartAsync();
+        await WaitUntilPostgresReadyAsync();
 
-        Database = new DatabaseContainer(PostgresContainer.GetConnectionString());
+        Database = new DatabaseContainer(GetConnectionString);
         await Database.InitializeAsync();
 
         Server1 = new TestServer(await CreateTestServerAsync());
         Server2 = new TestServer(await CreateTestServerAsync());
+    }
+
+    private string GetConnectionString() =>
+        $"Host=127.0.0.1;Port={_postgresContainer!.GetMappedPublicPort(5432)};Username={PostgresUser};Password={PostgresPassword};Database=postgres;";
+
+    private async Task WaitUntilPostgresReadyAsync()
+    {
+        for (var i = 0; i < TestTimeouts.HealthCheckMaxAttempts; i++)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(GetConnectionString());
+                await connection.OpenAsync();
+                
+                return;
+            }
+            catch
+            {
+                await Task.Delay(TestTimeouts.HealthCheckPollInterval);
+            }
+        }
+
+        throw new TimeoutException("Postgres did not become ready.");
     }
 
     private async Task<TestServerContainer> CreateTestServerAsync()
@@ -55,8 +83,9 @@ public class PostgresRestartFixture(ContainerFixture containerFixture) : IAsyncL
 
     public async Task RestartPostgresAsync()
     {
-        await PostgresContainer!.StopAsync();
-        await PostgresContainer!.StartAsync();
+        await _postgresContainer!.StopAsync();
+        await _postgresContainer!.StartAsync();
+        await WaitUntilPostgresReadyAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -64,7 +93,7 @@ public class PostgresRestartFixture(ContainerFixture containerFixture) : IAsyncL
         await Server1!.DisposeAsync();
         await Server2!.DisposeAsync();
         await Database!.DisposeAsync();
-        await PostgresContainer!.DisposeAsync();
+        await _postgresContainer!.DisposeAsync();
         await _network!.DisposeAsync();
 
         GC.SuppressFinalize(this);

@@ -2,19 +2,19 @@ using Npgsql;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class DatabaseContainer(string connectionString) : IAsyncLifetime
+public class DatabaseContainer(Func<string> getConnectionString) : IAsyncLifetime
 {
     private readonly string _uniqueName = Guid.NewGuid().ToString("N");
 
-    public string ConnectionString => 
-        new NpgsqlConnectionStringBuilder(connectionString) 
+    public string ConnectionString =>
+        new NpgsqlConnectionStringBuilder(getConnectionString())
         {
             Database = _uniqueName
         }
         .ConnectionString;
 
     public string ConnectionStringInternal =>
-        new NpgsqlConnectionStringBuilder(connectionString)
+        new NpgsqlConnectionStringBuilder(getConnectionString())
         {
             Database = _uniqueName,
             Host = "postgres_network",
@@ -24,7 +24,7 @@ public class DatabaseContainer(string connectionString) : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        await using var connection = new NpgsqlConnection(connectionString);
+        await using var connection = new NpgsqlConnection(getConnectionString());
         await connection.OpenAsync();
 
         await using var createDatabaseCommand = connection.CreateCommand();
@@ -34,7 +34,7 @@ public class DatabaseContainer(string connectionString) : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        await using var connection = new NpgsqlConnection(connectionString);
+        await using var connection = new NpgsqlConnection(getConnectionString());
         await connection.OpenAsync();
 
         await using (var terminateBackendCommand = new NpgsqlCommand("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = @databaseName;", connection))
