@@ -41,6 +41,12 @@ public class TestServer(TestServerContainer container) : IAsyncDisposable
         }
     }
 
+    public async Task RestartAsync()
+    {
+        await container.StopAsync();
+        await container.StartAsync();
+    }
+
     public async ValueTask DisposeAsync()
     {
         await container.DisposeAsync();

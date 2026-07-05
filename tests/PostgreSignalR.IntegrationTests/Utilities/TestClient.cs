@@ -46,8 +46,9 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
     {
         connection.Register<IClient>(Receiver);
         _serverProxy = connection.CreateHubProxy<IServer>();
-        
-        await connection.StartAsync();
+
+        using var cts = new CancellationTokenSource(TestTimeouts.ConnectionStartTimeout);
+        await connection.StartAsync(cts.Token);
     }
 
     public static async Task<TestClient> CreateAsync(Uri address, string? user = null)
@@ -59,8 +60,16 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
                 .Build()
         );
 
-        await client.InitializeAsync();
-        return client;
+        try
+        {
+            await client.InitializeAsync();
+            return client;
+        }
+        catch
+        {
+            await client.DisposeAsync();
+            throw;
+        }
     }
 
     private static Uri AddUser(Uri baseUri, string? user) =>

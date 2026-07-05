@@ -3,9 +3,17 @@ using NpgsqlTypes;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public abstract class PayloadTableTestBase(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
+public abstract class PayloadTableTestBase(ContainerFixture fixture, BackplaneTestConfiguration configuration) : TestData
 {
     private const string TableName = "backplane_payloads";
+
+    protected string DatabaseConnectionString { get; private set; } = null!;
+
+    public override async ValueTask InitializeAsync() =>
+        (_, DatabaseConnectionString) = await fixture.GetSingleServerAsync(configuration);
+
+    public override ValueTask DisposeAsync() =>
+        default;
 
     protected async Task<long> InsertPayloadRowAsync(TimeSpan age)
     {

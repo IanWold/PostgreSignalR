@@ -11,6 +11,9 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class ContainerFixture : IAsyncLifetime
 {
+    private readonly ConcurrentDictionary<BackplaneTestConfiguration, Task<ConfiguredServerPair>> _configuredServerPairs = new();
+    private readonly ConcurrentDictionary<BackplaneTestConfiguration, Task<ConfiguredSingleServer>> _configuredSingleServers = new();
+
     public INetwork? Network { get; set; }
     public IFutureDockerImage? TestServerImage { get; set; }
     public PostgreSqlContainer? PostgresContainer { get; set; }
@@ -18,10 +21,6 @@ public class ContainerFixture : IAsyncLifetime
     public DatabaseContainer? SharedDatabse { get; set; }
     public TestServer? SharedServer1 { get; set; }
     public TestServer? SharedServer2 { get; set; }
-
-    // Non-default configurations are provisioned lazily on first request and cached for the remainder of the
-    // test run, keyed by value so every test asking for the same configuration reuses the same server pair.
-    private readonly ConcurrentDictionary<BackplaneTestConfiguration, Task<ConfiguredServerPair>> _configuredServerPairs = new();
 
     public async Task<DatabaseContainer> GetDatabaseAsync()
     {
@@ -53,12 +52,6 @@ public class ContainerFixture : IAsyncLifetime
         return new TestServerContainer(container);
     }
 
-    /// <summary>
-    /// Gets a server pair configured per <paramref name="configuration"/>. The default configuration returns
-    /// the two servers shared by the whole test run; any other configuration is provisioned on its own
-    /// database and pair of app containers (built from the same shared image, just with different
-    /// environment variables), created once on first request and reused afterward.
-    /// </summary>
     public Task<(TestServer Server1, TestServer Server2)> GetServerPairAsync(BackplaneTestConfiguration configuration) =>
         configuration == BackplaneTestConfiguration.Default
             ? Task.FromResult((SharedServer1!, SharedServer2!))
@@ -70,10 +63,6 @@ public class ContainerFixture : IAsyncLifetime
         return (pair.Server1, pair.Server2);
     }
 
-    /// <summary>
-    /// Gets the connection string for the database backing <paramref name="configuration"/>'s server pair,
-    /// for tests that need to inspect backplane-managed state (e.g. the payload table) directly.
-    /// </summary>
     public async Task<string> GetDatabaseConnectionStringAsync(BackplaneTestConfiguration configuration)
     {
         if (configuration == BackplaneTestConfiguration.Default)
@@ -94,6 +83,22 @@ public class ContainerFixture : IAsyncLifetime
         var server2 = new TestServer(await CreateTestServerAsync(database, environment));
 
         return new ConfiguredServerPair(database, server1, server2);
+    }
+
+    public async Task<(TestServer Server, string DatabaseConnectionString)> GetSingleServerAsync(BackplaneTestConfiguration configuration)
+    {
+        var single = await _configuredSingleServers.GetOrAdd(configuration, CreateConfiguredSingleServerAsync);
+        return (single.Server, single.Database.ConnectionString);
+    }
+
+    private async Task<ConfiguredSingleServer> CreateConfiguredSingleServerAsync(BackplaneTestConfiguration configuration)
+    {
+        var database = await GetDatabaseAsync();
+        var environment = configuration.ToEnvironmentVariables();
+
+        var server = new TestServer(await CreateTestServerAsync(database, environment));
+
+        return new ConfiguredSingleServer(database, server);
     }
 
     public async ValueTask InitializeAsync()
@@ -135,7 +140,6 @@ public class ContainerFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        // Stop app servers before dropping the databases they're connected to, rather than the reverse.
         await SharedServer1!.DisposeAsync();
         await SharedServer2!.DisposeAsync();
         await SharedDatabse!.DisposeAsync();
@@ -143,9 +147,18 @@ public class ContainerFixture : IAsyncLifetime
         foreach (var pairTask in _configuredServerPairs.Values)
         {
             var pair = await pairTask;
+
             await pair.Server1.DisposeAsync();
             await pair.Server2.DisposeAsync();
             await pair.Database.DisposeAsync();
+        }
+
+        foreach (var singleTask in _configuredSingleServers.Values)
+        {
+            var single = await singleTask;
+
+            await single.Server.DisposeAsync();
+            await single.Database.DisposeAsync();
         }
 
         await Network!.DisposeAsync();
@@ -156,4 +169,5 @@ public class ContainerFixture : IAsyncLifetime
     }
 
     private sealed record ConfiguredServerPair(DatabaseContainer Database, TestServer Server1, TestServer Server2);
+    private sealed record ConfiguredSingleServer(DatabaseContainer Database, TestServer Server);
 }
