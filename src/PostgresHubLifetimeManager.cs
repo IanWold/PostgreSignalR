@@ -90,7 +90,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
 
         _payloadStrategy = payloadStrategy;
 
-        _postgresListener = new(options.Value.DataSource);
+        _postgresListener = new(options.Value.DataSource, logger);
         _postgresListener.OnNotification += OnNotification;
     }
 
