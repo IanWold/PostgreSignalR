@@ -10,7 +10,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Build
+    name: Build (${{ matrix.tfm }})
+    strategy:
+      fail-fast: false
+      matrix:
+        tfm: [net8.0, net9.0, net10.0]
     steps:
     - uses: actions/checkout@v7
     - name: Setup .NET
@@ -22,12 +26,5 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Test
-      run: dotnet test PostgreSignalR.slnx --no-build --verbosity normal -m:1 --results-directory ./TestResults --blame-hang --blame-hang-timeout 2m --blame-hang-dump-type mini -- --stop-on-fail on
+      run: dotnet test tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj -f ${{ matrix.tfm }} --no-build --verbosity normal --blame-hang --blame-hang-timeout 2m --blame-hang-dump-type mini -- --stop-on-fail on
       timeout-minutes: 10
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results
-        path: ./TestResults
-        retention-days: 5
