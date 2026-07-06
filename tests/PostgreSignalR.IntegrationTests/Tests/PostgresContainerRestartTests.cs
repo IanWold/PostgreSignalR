@@ -19,4 +19,25 @@ public class PostgresContainerRestartTests(PostgresRestartFixture fixture) : Pos
         await RestartPostgresAsync();
         await RetryAssertions.AssertEventuallyDeliveredAsync(client1, client2);
     }
+
+    [RetryFact]
+    public async Task BackplaneRecoversWhenFirstConnectionOccursDuringOutage()
+    {
+        await StopPostgresAsync();
+
+        await using var receiver = await CreateAdditionalServerAsync(new Dictionary<string, string>
+        {
+            ["UseTableStrategy"] = "false"
+        });
+
+        await using var client2 = await receiver.CreateClientAsync(waitForHealthy: false);
+
+        await StartPostgresAsync();
+
+        await using var client1 = await Server1.CreateClientAsync();
+        await using var client2b = await receiver.CreateClientAsync();
+
+        await RetryAssertions.AssertEventuallyDeliveredAsync(client1, client2);
+        await RetryAssertions.AssertEventuallyDeliveredAsync(client1, client2b);
+    }
 }

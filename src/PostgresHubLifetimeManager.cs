@@ -40,6 +40,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
     private readonly string _serverName = GenerateServerName();
     private readonly PostgresProtocol _protocol;
     private readonly SemaphoreSlim _commandLock = new(1);
+    private readonly SemaphoreSlim _initializationLock = new(1, 1);
     private readonly ConcurrentDictionary<string, Action<byte[]>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ClientResultsManager _clientResultsManager = new();
     private readonly PostgresListener _postgresListener;
@@ -101,35 +102,49 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
             return;
         }
 
-        _isInitialized = true;
-
-        _logger.BackplaneInitializing();
+        await _initializationLock.WaitAsync();
 
         try
         {
-            await _postgresListener.EnsureReadyAsync();
+            if (_isInitialized)
+            {
+                return;
+            }
 
-            await Task.WhenAll([
-                SubscribeToAll(),
-                SubscribeToGroupManagementChannel(),
-                SubscribeToAckChannel(),
-                SubscribeToReturnResultsAsync()
-            ]);
+            _logger.BackplaneInitializing();
 
             try
             {
-                _options.InvokeOnInitialized();
+                await _postgresListener.EnsureReadyAsync();
+
+                await Task.WhenAll([
+                    SubscribeToAll(),
+                    SubscribeToGroupManagementChannel(),
+                    SubscribeToAckChannel(),
+                    SubscribeToReturnResultsAsync()
+                ]);
+
+                _isInitialized = true;
+
+                try
+                {
+                    _options.InvokeOnInitialized();
+                }
+                catch (Exception ex)
+                {
+                    _logger.BackplaneErrorDuringOnInitialized(ex);
+                }
+
+                _logger.BackplaneInitialized();
             }
             catch (Exception ex)
             {
-                _logger.BackplaneErrorDuringOnInitialized(ex);
+                _logger.BackplaneUnableInitialize(ex);
             }
-
-            _logger.BackplaneInitialized();
         }
-        catch (Exception ex)
+        finally
         {
-            _logger.BackplaneUnableInitialize(ex);
+            _initializationLock.Release();
         }
     }
 

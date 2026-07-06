@@ -67,15 +67,27 @@ public class PostgresRestartFixture(ContainerFixture containerFixture) : IAsyncL
         throw new TimeoutException("Postgres did not become ready.");
     }
 
-    private async Task<TestServerContainer> CreateTestServerAsync()
+    private Task<TestServerContainer> CreateTestServerAsync() =>
+        CreateTestServerAsync(null);
+
+    public async Task<TestServerContainer> CreateTestServerAsync(IReadOnlyDictionary<string, string>? environment)
     {
-        var container = new ContainerBuilder(containerFixture.TestServerImage)
+        var containerBuilder = new ContainerBuilder(containerFixture.TestServerImage)
             .WithName($"signalr-test-pgrestart-{Guid.NewGuid():N}")
             .WithNetwork(_network)
             .WithEnvironment("ConnectionStrings__Postgres", Database!.ConnectionStringInternal)
             .WithPortBinding(8080, assignRandomHostPort: true)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8080))
-            .Build();
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8080));
+
+        if (environment is not null)
+        {
+            foreach (var (key, value) in environment)
+            {
+                containerBuilder = containerBuilder.WithEnvironment(key, value);
+            }
+        }
+
+        var container = containerBuilder.Build();
 
         await container.StartAsync();
         return new TestServerContainer(container);
@@ -83,7 +95,39 @@ public class PostgresRestartFixture(ContainerFixture containerFixture) : IAsyncL
 
     public async Task RestartPostgresAsync()
     {
+        await StopPostgresAsync();
+        await StartPostgresAsync();
+    }
+
+    public async Task StopPostgresAsync()
+    {
         await _postgresContainer!.StopAsync();
+        await WaitUntilPostgresUnreachableAsync();
+        await Task.Delay(TimeSpan.FromSeconds(2));
+    }
+
+    private async Task WaitUntilPostgresUnreachableAsync()
+    {
+        for (var i = 0; i < TestTimeouts.HealthCheckMaxAttempts; i++)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(GetConnectionString());
+                await connection.OpenAsync();
+            }
+            catch
+            {
+                return;
+            }
+
+            await Task.Delay(TestTimeouts.HealthCheckPollInterval);
+        }
+
+        throw new TimeoutException("Postgres did not become unreachable.");
+    }
+
+    public async Task StartPostgresAsync()
+    {
         await _postgresContainer!.StartAsync();
         await WaitUntilPostgresReadyAsync();
     }
