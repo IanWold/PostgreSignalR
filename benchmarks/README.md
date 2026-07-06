@@ -18,11 +18,17 @@ There are two modes it can run in:
 * `single` runs a single round of tests
 * `sweep` will run many rounds of tests, incrementing the number of clients. It will sweep up and down.
 
-The other variables you acn specify:
+The other variables you can specify:
 
-* `CLIENTS`: the numbre of clients to connect.
+* `CLIENTS`: the number of clients to connect.
 * `PUBLISH_COUNT`: The number of messages to publish. Default 20000.
-* `CONCURRENCY`: The maximum number of concurrent requests (from server). Default 128.
-* `PAYLOAD_BYTES`: The number of bytes in the payload. Default 128.
+* `CONCURRENCY`: The maximum number of concurrent `SendAsync` calls in flight on the server at any time, for the lifetime of the run. Default 128.
+* `PAYLOAD_BYTES`: The number of bytes of filler content included in each message's payload. Default 128.
 * `WARMUP_SECONDS`: The number of seconds to warm up. Default 10.
 * `MEASURE_SECONDS`: For `single` runs, the number of seconds to measure. Messages/second will be `PUBLISH_COUNT / MEASURE_SECONDS`.
+* `REPEATS_PER_RATE`: The number of independent trials to run at each rate (each rate in a `sweep`, or the single trial in `single` mode). Latency percentiles are computed over the pooled samples from all repeats; `Sent`/`Missing`/`Fanout Copies` are summed. Default 1.
+* `PAYLOAD_STRATEGY`: Only applies when `BACKPLANE=postgres`
+    * `event` (default) sends payloads inline in the notification event.
+    * `table` uses PostgreSignalR's payload table strategy instead (`AddBackplaneTablePayloadStrategy` with `StorageMode=Always`).
+
+The `sweep` output table's `Rate (msg/s)` column is the offered rate, i.e. what the driver was asked to send - it is not necessarily what was achieved. The `Achieved (msg/s)` column is the rate actually measured (messages sent / actual dispatch time), which falls below the target once the driver or server can't keep up. When achieved rate drops more than 5% below target, a warning is printed, since the latency figures on that row reflect the achieved rate, not the labeled one. The same applies to `single` mode's `Sent ... achieved` line.

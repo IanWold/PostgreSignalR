@@ -30,6 +30,7 @@ var sweepMaxRate   = int.Parse(Env("SWEEP_MAX_RATE", "2000"));
 var sweepTrialSeconds = int.Parse(Env("SWEEP_TRIAL_SECONDS", "15"));
 
 var batchSize = int.Parse(Env("BATCH_SIZE", "25"));
+var repeatsPerRate = int.Parse(Env("REPEATS_PER_RATE", "1"));
 
 Console.WriteLine();
 Console.WriteLine("Benchmark Starting...");
@@ -38,6 +39,7 @@ Console.WriteLine($"ServerB: {serverB}");
 Console.WriteLine($"Clients: {clients}");
 Console.WriteLine($"PublishCount: {publishCount}, Concurrency: {concurrency}, PayloadBytes: {payloadBytes}");
 Console.WriteLine($"WarmupSeconds: {warmupSeconds}, MeasureSeconds: {measureSeconds}");
+Console.WriteLine($"RepeatsPerRate: {repeatsPerRate}");
 
 using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 
@@ -96,17 +98,23 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
     async Task<bool> sweep(int rate)
     {
         var result = await RunTrialAsync(
-            http, serverA,
-            rate, sweepTrialSeconds,
-            concurrency, payloadBytes,
+            http,
+            serverA,
+            rate,
+            sweepTrialSeconds,
+            repeatsPerRate,
+            concurrency,
+            payloadBytes,
             batchSize,
-            seen, fanoutCopies,
+            seen,
+            fanoutCopies,
             histogram,
             v => measuring = v
         );
 
         Console.WriteLine(
             $"| {$"{result.TargetRateMsgsPerSec,12}"} |" +
+            $" {$"{result.AchievedRateMsgsPerSec,14:F0}"} |" +
             $" {result.P50Us,8} |" +
             $" {result.P95Us,8} |" +
             $" {result.P99Us,8} |" +
@@ -115,6 +123,11 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
             $" {$"{result.FanoutCopies,13}"} |" +
             $" {$"{result.Sent,13}"} |"
         );
+
+        if (result.AchievedRateMsgsPerSec < rate * 0.95)
+        {
+            Console.WriteLine($"  Warning: achieved {result.AchievedRateMsgsPerSec:F0} msg/s, below the {rate} msg/s target - driver/server could not keep pace, latency at this row reflects a lower effective rate");
+        }
 
         if (result.P99Us > sloP99Ms * 1000L)
         {
@@ -133,8 +146,8 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
 
     Console.WriteLine();
     Console.WriteLine("Sweep up:");
-    Console.WriteLine("| Rate (msg/s) | p50 (Us) | p95 (Us) | p99 (Us) | Max (Us) | Missing | Fanout Copies | Messages Sent |");
-    Console.WriteLine("|--------------|----------|----------|----------|----------|---------|---------------|---------------|");
+    Console.WriteLine("| Rate (msg/s) | Achieved (msg/s) | p50 (Us) | p95 (Us) | p99 (Us) | Max (Us) | Missing | Fanout Copies | Messages Sent |");
+    Console.WriteLine("|--------------|------------------|----------|----------|----------|----------|---------|---------------|---------------|");
 
     for (int rate = sweepStartRate; rate <= sweepMaxRate; rate += sweepStepRate)
     {
@@ -146,8 +159,8 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
 
     Console.WriteLine();
     Console.WriteLine("Sweep down:");
-    Console.WriteLine("| Rate (msg/s) | p50 (Us) | p95 (Us) | p99 (Us) | Max (Us) | Missing | Fanout Copies | Messages Sent |");
-    Console.WriteLine("|--------------|----------|----------|----------|----------|---------|---------------|---------------|");
+    Console.WriteLine("| Rate (msg/s) | Achieved (msg/s) | p50 (Us) | p95 (Us) | p99 (Us) | Max (Us) | Missing | Fanout Copies | Messages Sent |");
+    Console.WriteLine("|--------------|------------------|----------|----------|----------|----------|---------|---------------|---------------|");
 
     for (int rate = sweepMaxRate; rate >= sweepStartRate; rate -= sweepStepRate)
     {
@@ -163,11 +176,16 @@ else
     Console.WriteLine($"Single run: targetRate={targetRate} msg/s for {measureSeconds}s");
 
     var result = await RunTrialAsync(
-        http, serverA,
-        targetRate, measureSeconds,
-        concurrency, payloadBytes,
+        http,
+        serverA,
+        targetRate,
+        measureSeconds,
+        repeatsPerRate,
+        concurrency,
+        payloadBytes,
         batchSize,
-        seen, fanoutCopies,
+        seen,
+        fanoutCopies,
         histogram,
         v => measuring = v
     );
@@ -175,7 +193,13 @@ else
     Console.WriteLine();
     Console.WriteLine("Benchmark results:");
     Console.WriteLine($"Target rate: {result.TargetRateMsgsPerSec} msg/s for {measureSeconds}s");
-    Console.WriteLine($"Sent: {result.Sent} in {result.SendElapsedSec:F2}s");
+    Console.WriteLine($"Sent: {result.Sent} in {result.SendElapsedSec:F2}s ({result.AchievedRateMsgsPerSec:F0} msg/s achieved)");
+
+    if (result.AchievedRateMsgsPerSec < result.TargetRateMsgsPerSec * 0.95)
+    {
+        Console.WriteLine($"Warning: achieved rate fell short of the {result.TargetRateMsgsPerSec} msg/s target - driver/server could not keep pace, latency below reflects a lower effective rate");
+    }
+
     Console.WriteLine($"Unique received: {result.UniqueReceived}");
     Console.WriteLine($"Missing: {result.Missing}");
     Console.WriteLine($"Fanout copies (expected): {result.FanoutCopies}");
@@ -237,72 +261,90 @@ static async Task<TrialResult> RunTrialAsync(
     string serverA,
     int targetRateMsgsPerSec,
     int trialSeconds,
+    int repeats,
     int concurrency,
     int payloadBytes,
     int batchSize,
     ConcurrentDictionary<string, byte> seen,
     Counter fanoutCopies,
     LongHistogram hist,
-    Action<bool> setMeasuring)
+    Action<bool> setMeasuring
+)
 {
-    seen.Clear();
-    Interlocked.Exchange(ref fanoutCopies.Value, 0);
-    lock (hist) hist.Reset();
+    var pooledHist = new LongHistogram(60000000, 3);
 
-    setMeasuring(true);
+    long totalSent = 0;
+    long totalUnique = 0;
+    long totalFanoutCopies = 0;
+    double totalElapsedSec = 0;
 
-    var delay = TimeSpan.FromMilliseconds((int)Math.Max(0, Math.Round(1000.0 * batchSize / targetRateMsgsPerSec)));
-
-    var totalToSend = Math.Max(1, targetRateMsgsPerSec * trialSeconds);
-
-    var batchPeriod = TimeSpan.FromSeconds(batchSize / (double)targetRateMsgsPerSec);
-    var next = Stopwatch.GetTimestamp();
-    var tickFreq = (double)Stopwatch.Frequency;
-
-    var sw = Stopwatch.StartNew();
-
-    for (int sent = 0; sent < totalToSend; sent += batchSize)
+    for (int repeat = 0; repeat < repeats; repeat++)
     {
-        var thisBatch = Math.Min(batchSize, totalToSend - sent);
+        seen.Clear();
+        Interlocked.Exchange(ref fanoutCopies.Value, 0);
+        lock (hist) hist.Reset();
 
-        await Publish(http, serverA, thisBatch, concurrency, payloadBytes);
+        setMeasuring(true);
 
-        next += (long)(batchPeriod.TotalSeconds * tickFreq);
-        var now = Stopwatch.GetTimestamp();
-        var remainingTicks = next - now;
+        var totalToSend = Math.Max(1, targetRateMsgsPerSec * trialSeconds);
+        var batchPeriod = TimeSpan.FromSeconds(batchSize / (double)targetRateMsgsPerSec);
+        var next = Stopwatch.GetTimestamp();
+        var tickFreq = (double)Stopwatch.Frequency;
 
-        if (remainingTicks > 0)
+        var sw = Stopwatch.StartNew();
+
+        var inFlight = new List<Task>();
+
+        for (int sent = 0; sent < totalToSend; sent += batchSize)
         {
-            var remainingMs = (int)(remainingTicks * 1000.0 / tickFreq);
+            var thisBatch = Math.Min(batchSize, totalToSend - sent);
 
-            if (remainingMs > 0)
+            inFlight.Add(Publish(http, serverA, thisBatch, concurrency, payloadBytes));
+
+            next += (long)(batchPeriod.TotalSeconds * tickFreq);
+            var now = Stopwatch.GetTimestamp();
+            var remainingTicks = next - now;
+
+            if (remainingTicks > 0)
             {
-                await Task.Delay(remainingMs);
-            }
-            else
-            {
-                await Task.Yield();
+                var remainingMs = (int)(remainingTicks * 1000.0 / tickFreq);
+
+                if (remainingMs > 0)
+                {
+                    await Task.Delay(remainingMs);
+                }
+                else
+                {
+                    await Task.Yield();
+                }
             }
         }
+
+        await Task.WhenAll(inFlight);
+        sw.Stop();
+
+        await Task.Delay(1000);
+        setMeasuring(false);
+
+        totalSent += totalToSend;
+        totalUnique += seen.Count;
+        totalFanoutCopies += Interlocked.Read(ref fanoutCopies.Value);
+        totalElapsedSec += sw.Elapsed.TotalSeconds;
+
+        lock (hist) pooledHist.Add(hist);
     }
 
-    sw.Stop();
+    var missing = Math.Max(0, totalSent - totalUnique);
 
-    await Task.Delay(1000);
-    setMeasuring(false);
-
-    var unique = seen.Count;
-    var missing = Math.Max(0, totalToSend - unique);
-
-    (long p50, long p95, long p99, long max) = GetPercentiles(hist);
+    (long p50, long p95, long p99, long max) = GetPercentiles(pooledHist);
 
     return new TrialResult(
         targetRateMsgsPerSec,
-        totalToSend,
-        sw.Elapsed.TotalSeconds,
-        unique,
-        missing,
-        Interlocked.Read(ref fanoutCopies.Value),
+        (int)totalSent,
+        totalElapsedSec,
+        (int)totalUnique,
+        (int)missing,
+        totalFanoutCopies,
         p50, p95, p99, max
     );
 }

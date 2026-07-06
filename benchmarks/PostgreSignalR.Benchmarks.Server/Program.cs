@@ -1,6 +1,7 @@
 using PostgreSignalR.Benchmarks.Abstractions;
 using PostgreSignalR.Benchmarks.Server;
 using Microsoft.AspNetCore.SignalR;
+using PostgreSignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,8 +10,7 @@ builder.Services.AddSignalR();
 
 var backplane = (Environment.GetEnvironmentVariable("BACKPLANE") ?? throw new Exception()).ToLowerInvariant();
 
-// Uncomment if running benchmarks with payload table
-//var instantiatePayloadTable = bool.Parse(Environment.GetEnvironmentVariable("MAKETABLE") ?? "false");
+var usePayloadTable = (Environment.GetEnvironmentVariable("PAYLOAD_STRATEGY") ?? "event").Equals("table", StringComparison.OrdinalIgnoreCase);
 
 if (backplane is "redis")
 {
@@ -20,31 +20,39 @@ if (backplane is "redis")
 else if (backplane is "postgres")
 {
     var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception();
-    builder.Services.AddSignalR().AddPostgresBackplane(connectionString);
-    
-    // Uncomment if running benchmarks with payload table
-    // .AddBackplaneTablePayloadStrategy(o =>
-    // {
-    //     o.AutomaticCleanup = false;
-    //     o.StorageMode = PostgreSignalR.PostgresBackplanePayloadTableStorage.Always;
-    // });
+    var signalrBuilder = builder.Services.AddSignalR().AddPostgresBackplane(connectionString);
+
+    if (usePayloadTable)
+    {
+        signalrBuilder.AddBackplaneTablePayloadStrategy(o =>
+        {
+            o.AutomaticCleanup = false;
+            o.StorageMode = PostgresBackplanePayloadTableStorage.Always;
+        });
+    }
 }
 
 var app = builder.Build();
 
-// Uncomment if running benchmarks with payload table
-// if (backplane is "postgres")
-// {
-//     await app.InitializePostgresBackplanePayloadTableAsync();
-// }
+if (backplane is "postgres" && usePayloadTable)
+{
+    await app.InitializePostgresBackplanePayloadTableAsync();
+}
 
 app.MapHub<BenchmarkHub>("/hub");
 
-app.MapGet("/health", () => Results.Ok(new { ok = true, backplane }));
+app.MapGet("/health", () => Results.Ok(new { ok = true, backplane, payloadStrategy = usePayloadTable ? "table" : "event" }));
+
+SemaphoreSlim? publishSemaphore = null;
 
 app.MapPost("/publish", async (PublishRequest request, IHubContext<BenchmarkHub> hub, CancellationToken c) =>
 {
-    var semaphore = new SemaphoreSlim(request.Concurrency, request.Concurrency);
+    var semaphore = LazyInitializer.EnsureInitialized(
+        ref publishSemaphore,
+        () => new SemaphoreSlim(request.Concurrency, request.Concurrency)
+    );
+
+    var payload = request.PayloadBytes > 0 ? new string('x', request.PayloadBytes) : string.Empty;
     var sendTasks = new List<Task>(request.PublishCount);
 
     for (int i = 0; i < request.PublishCount; i++)
@@ -54,7 +62,8 @@ app.MapPost("/publish", async (PublishRequest request, IHubContext<BenchmarkHub>
         var message = new Message(
             MessageId: Guid.NewGuid().ToString("N"),
             SentUnixTimeMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-            PayloadBytes: request.PayloadBytes
+            PayloadBytes: request.PayloadBytes,
+            Payload: payload
         );
 
         sendTasks.Add(hub.Clients.All.SendAsync("bench", message, c).ContinueWith(

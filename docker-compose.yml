@@ -23,7 +23,7 @@ services:
       BACKPLANE: ${BACKPLANE:-none}
       # ConnectionStrings__Redis: redis:6379
       ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
-      MAKETABLE: true
+      PAYLOAD_STRATEGY: ${PAYLOAD_STRATEGY:-event}
     depends_on:
       - postgres
       # - redis
@@ -40,6 +40,7 @@ services:
       BACKPLANE: ${BACKPLANE:-none}
       # ConnectionStrings__Redis: redis:6379
       ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
+      PAYLOAD_STRATEGY: ${PAYLOAD_STRATEGY:-event}
     depends_on:
       - postgres
       # - redis
@@ -60,6 +61,7 @@ services:
       PAYLOAD_BYTES: ${PAYLOAD_BYTES:-128}
       WARMUP_SECONDS: ${WARMUP_SECONDS:-10}
       MEASURE_SECONDS: ${MEASURE_SECONDS:-30}
+      REPEATS_PER_RATE: ${REPEATS_PER_RATE:-1}
     depends_on:
       - servera
       - serverb

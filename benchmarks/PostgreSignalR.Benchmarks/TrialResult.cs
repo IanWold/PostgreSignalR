@@ -8,4 +8,8 @@ sealed record TrialResult(
     int Missing,
     long FanoutCopies,
     long P50Us, long P95Us, long P99Us, long MaxUs
-);
+)
+{
+    public double AchievedRateMsgsPerSec =>
+        SendElapsedSec > 0 ? Sent / SendElapsedSec : 0;
+}
