@@ -136,4 +136,18 @@ internal static partial class LogExtensions
         Message = "Postgres backplane failed to resolve the payload for notification on channel {Channel}."
     )]
     public static partial void BackplaneFailedResolvingPayload(this ILogger logger, string channel, Exception exception);
+
+    [LoggerMessage(
+        EventId = 190,
+        Level = LogLevel.Warning,
+        Message = "Postgres backplane failed to reconnect; retrying in {Delay}."
+    )]
+    public static partial void BackplaneReconnectFailedRetrying(this ILogger logger, TimeSpan delay, Exception exception);
+
+    [LoggerMessage(
+        EventId = 200,
+        Level = LogLevel.Information,
+        Message = "Postgres backplane reconnected after a prior failure."
+    )]
+    public static partial void BackplaneReconnected(this ILogger logger);
 }

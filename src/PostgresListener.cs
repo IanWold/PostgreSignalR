@@ -1,11 +1,14 @@
 using Npgsql;
 using System.Collections.Concurrent;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
 namespace PostgreSignalR;
 
-internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisposable
+internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logger) : IAsyncDisposable
 {
+    private static readonly TimeSpan ReconnectRetryDelay = TimeSpan.FromSeconds(1);
+
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly HashSet<string> _channels = new(StringComparer.Ordinal);
@@ -52,7 +55,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
                         }
                         catch
                         {
-                            await ReconnectCoreAsync(_cts.Token);
+                            await ReconnectWithRetryCoreAsync(_cts.Token);
                             connection = _connection!;
                         }
                     }
@@ -77,11 +80,37 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource) : IAsyncDisp
 
         try
         {
-            await ReconnectCoreAsync(ct);
+            await ReconnectWithRetryCoreAsync(ct);
         }
         finally
         {
             _gate.Release();
+        }
+    }
+
+    private async Task ReconnectWithRetryCoreAsync(CancellationToken ct)
+    {
+        var failedAtLeastOnce = false;
+
+        while (true)
+        {
+            try
+            {
+                await ReconnectCoreAsync(ct);
+
+                if (failedAtLeastOnce)
+                {
+                    logger.BackplaneReconnected();
+                }
+
+                return;
+            }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                failedAtLeastOnce = true;
+                logger.BackplaneReconnectFailedRetrying(ReconnectRetryDelay, ex);
+                await Task.Delay(ReconnectRetryDelay, ct);
+            }
         }
     }
 

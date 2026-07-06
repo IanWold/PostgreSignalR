@@ -1,5 +1,4 @@
 using Npgsql;
-using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
@@ -31,48 +30,11 @@ public abstract class ResiliencyTestBase(ContainerFixture fixture, BackplaneTest
     }
 
     protected static Task AssertEventuallyDeliveredAsync(TestClient sender, TestClient receiver, TimeSpan? timeout = null) =>
-        AssertEventuallyDeliveredAsync(() => sender.Send.SendToAll(Guid.NewGuid().ToString()), receiver, nameof(IClient.Message), timeout);
+        RetryAssertions.AssertEventuallyDeliveredAsync(sender, receiver, timeout);
 
     protected static Task AssertEventuallyDeliveredAsync(Func<Task> sendAction, TestClient receiver, string messageKey, TimeSpan? timeout = null) =>
-        AssertEventuallySucceedsAsync(
-            async () =>
-            {
-                var message = receiver.ExpectMessageAsync(messageKey, TimeSpan.FromSeconds(2));
+        RetryAssertions.AssertEventuallyDeliveredAsync(sendAction, receiver, messageKey, timeout);
 
-                await sendAction();
-                await message;
-            },
-            timeout
-        );
-
-    protected static async Task AssertEventuallySucceedsAsync(Func<Task> action, TimeSpan? timeout = null, TimeSpan? perAttemptTimeout = null)
-    {
-        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
-        var attemptTimeout = perAttemptTimeout ?? TestTimeouts.RetryAttemptTimeout;
-        Exception? lastFailure = null;
-
-        while (DateTime.UtcNow < deadline)
-        {
-            try
-            {
-                var attempt = action();
-                var winner = await Task.WhenAny(attempt, Task.Delay(attemptTimeout));
-
-                if (winner != attempt)
-                {
-                    throw new TimeoutException($"Attempt did not complete within {attemptTimeout}.");
-                }
-
-                await attempt;
-                return;
-            }
-            catch (Exception ex)
-            {
-                lastFailure = ex;
-                await Task.Delay(TestTimeouts.HealthCheckPollInterval);
-            }
-        }
-
-        Assert.Fail($"Backplane did not recover within the expected window. Last failure: {lastFailure}");
-    }
+    protected static Task AssertEventuallySucceedsAsync(Func<Task> action, TimeSpan? timeout = null, TimeSpan? perAttemptTimeout = null) =>
+        RetryAssertions.AssertEventuallySucceedsAsync(action, timeout, perAttemptTimeout);
 }
