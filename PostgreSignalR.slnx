@@ -10,6 +10,7 @@
     <File Path="benchmarks/docker-compose.yml" />
     <Project Path="benchmarks/PostgreSignalR.Benchmarks.Abstractions/PostgreSignalR.Benchmarks.Abstractions.csproj" />
     <Project Path="benchmarks/PostgreSignalR.Benchmarks.Server/PostgreSignalR.Benchmarks.Server.csproj" />
+    <Project Path="benchmarks/PostgreSignalR.Benchmarks.SharedLoad/PostgreSignalR.Benchmarks.SharedLoad.csproj" />
     <Project Path="benchmarks/PostgreSignalR.Benchmarks/PostgreSignalR.Benchmarks.csproj" />
   </Folder>
   

@@ -8,10 +8,10 @@ services:
     ports:
       - "5432:5432"
 
-  # redis:
-  #   image: redis:7
-  #   ports:
-  #     - "6379:6379"
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
 
   servera:
     build:
@@ -21,12 +21,12 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Logging__LogLevel__Default: Warning
       BACKPLANE: ${BACKPLANE:-none}
-      # ConnectionStrings__Redis: redis:6379
+      ConnectionStrings__Redis: redis:6379
       ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
       PAYLOAD_STRATEGY: ${PAYLOAD_STRATEGY:-event}
     depends_on:
       - postgres
-      # - redis
+      - redis
     ports:
       - "8081:8080"
 
@@ -38,14 +38,29 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Logging__LogLevel__Default: Warning
       BACKPLANE: ${BACKPLANE:-none}
-      # ConnectionStrings__Redis: redis:6379
+      ConnectionStrings__Redis: redis:6379
       ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
       PAYLOAD_STRATEGY: ${PAYLOAD_STRATEGY:-event}
     depends_on:
       - postgres
-      # - redis
+      - redis
     ports:
       - "8082:8080"
+
+  shared-load:
+    build:
+      context: .
+      dockerfile: benchmarks/PostgreSignalR.Benchmarks.SharedLoad/Dockerfile
+    environment:
+      BACKPLANE: ${BACKPLANE:-none}
+      SIMULATE_SHARED_LOAD: ${SIMULATE_SHARED_LOAD:-false}
+      SHARED_LOAD_CONCURRENCY: ${SHARED_LOAD_CONCURRENCY:-16}
+      SHARED_LOAD_OPS_PER_SEC: ${SHARED_LOAD_OPS_PER_SEC:-200}
+      ConnectionStrings__Redis: redis:6379
+      ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
+    depends_on:
+      - postgres
+      - redis
 
   driver:
     build:
@@ -65,3 +80,4 @@ services:
     depends_on:
       - servera
       - serverb
+      - shared-load
