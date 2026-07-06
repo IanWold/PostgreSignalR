@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class HashAlwaysChannelNamingTests(ContainerFixture fixture) : ConfigurableBaseTest(fixture, new(ChannelNameNormaization: ChannelNameNormaization.HashAlways))
 {
-    [RetryFact]
+    [Fact]
     public async Task Broadcast_AllServersReceive()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -19,7 +19,7 @@ public class HashAlwaysChannelNamingTests(ContainerFixture fixture) : Configurab
         Assert.Equal(ShortMessage, (await messageFromClient2).Arg<string>());
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Group_SendHitsMembersAcrossServers()
     {
         await using var member1 = await Server1.CreateClientAsync();

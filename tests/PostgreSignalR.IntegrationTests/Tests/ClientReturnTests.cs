@@ -2,7 +2,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class ClientReturnTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [RetryFact]
+    [Fact]
     public async Task Invoke_ReturnsAcrossServers()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -15,7 +15,7 @@ public class ClientReturnTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Equal($"echo:{ShortMessage}", result);
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Invoke_ReturnsWithinSameServer()
     {
         await using var caller = await Server1.CreateClientAsync();

@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [RetryFact]
+    [Fact]
     public async Task CallerOnly_DoesNotReachOthers()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -18,7 +18,7 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         await other.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Others_ReachAllOtherClients()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -36,7 +36,7 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         await caller.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Broadcast_AllExceptOneDoesNotReachExcluded()
     {
         await using var client1 = await Server1.CreateClientAsync();

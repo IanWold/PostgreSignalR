@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class PayloadTableAlwaysStorageTests(ContainerFixture fixture) : ConfigurableBaseTest(fixture, new(PayloadTableStorage: PayloadTableStorage.Always))
 {
-    [RetryFact]
+    [Fact]
     public async Task Broadcast_ShortMessageStillDelivered()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -19,7 +19,7 @@ public class PayloadTableAlwaysStorageTests(ContainerFixture fixture) : Configur
         Assert.Equal(ShortMessage, (await messageFromClient2).Arg<string>());
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Connection_TargetsSingleConnection()
     {
         await using var sender = await Server1.CreateClientAsync();

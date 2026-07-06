@@ -10,7 +10,7 @@ public abstract class PayloadTestBase<TPayload>(ContainerFixture fixture) : Base
     protected abstract Task SendToGroupAsync(TestClient sender, string groupName, TPayload payload);
     protected abstract Task SendToUsersAsync(TestClient sender, string[] userIds, TPayload payload);
 
-    [RetryFact]
+    [Fact]
     public async Task Broadcast_AllServersReceive()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -25,7 +25,7 @@ public abstract class PayloadTestBase<TPayload>(ContainerFixture fixture) : Base
         Assert.Equal(Payload, (await messageFromClient2).Arg<TPayload>());
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Connection_TargetsSingleConnection()
     {
         await using var sender = await Server1.CreateClientAsync();
@@ -43,7 +43,7 @@ public abstract class PayloadTestBase<TPayload>(ContainerFixture fixture) : Base
         await bystander.EnsureNoMessageAsync(MessageKey);
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Group_SendHitsMembersAcrossServers()
     {
         await using var member1 = await Server1.CreateClientAsync();
@@ -64,7 +64,7 @@ public abstract class PayloadTestBase<TPayload>(ContainerFixture fixture) : Base
         await outsider.EnsureNoMessageAsync(MessageKey);
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Users_SendToUsersHitsMultipleUsers()
     {
         await using var user1 = await Server1.CreateClientAsync("u1");

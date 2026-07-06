@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [RetryFact]
+    [Fact]
     public async Task Users_SendToUserHitsAllConnections()
     {
         await using var user1a = await Server1.CreateClientAsync("u1");

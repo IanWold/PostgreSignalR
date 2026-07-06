@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class ServerRestartTests(ContainerFixture fixture) : ConfigurableBaseTest(fixture, new(Prefix: "restart"))
 {
-    [RetryFact]
+    [Fact]
     public async Task ServerRecoversAfterRestart()
     {
         await using var client1 = await Server1.CreateClientAsync();

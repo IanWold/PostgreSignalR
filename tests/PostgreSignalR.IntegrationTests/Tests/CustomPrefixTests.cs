@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class CustomPrefixTests(ContainerFixture fixture) : ConfigurableBaseTest(fixture, new(Prefix: "custom"))
 {
-    [RetryFact]
+    [Fact]
     public async Task Broadcast_AllServersReceive()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -19,7 +19,7 @@ public class CustomPrefixTests(ContainerFixture fixture) : ConfigurableBaseTest(
         Assert.Equal(ShortMessage, (await messageFromClient2).Arg<string>());
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Group_SendHitsMembersAcrossServers()
     {
         await using var member1 = await Server1.CreateClientAsync();

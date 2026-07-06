@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class PostgresContainerRestartTests(PostgresRestartFixture fixture) : PostgresRestartTestBase(fixture)
 {
-    [RetryFact]
+    [Fact]
     public async Task BackplaneRecoversAfterPostgresRestart()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -20,7 +20,7 @@ public class PostgresContainerRestartTests(PostgresRestartFixture fixture) : Pos
         await RetryAssertions.AssertEventuallyDeliveredAsync(client1, client2);
     }
 
-    [RetryFact]
+    [Fact]
     public async Task BackplaneRecoversWhenFirstConnectionOccursDuringOutage()
     {
         await StopPostgresAsync();

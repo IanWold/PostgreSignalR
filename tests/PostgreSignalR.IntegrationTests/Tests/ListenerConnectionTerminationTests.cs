@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class ListenerConnectionTerminationTests(ContainerFixture fixture) : ResiliencyTestBase(fixture, new(Prefix: "backend-kill"))
 {
-    [RetryFact]
+    [Fact]
     public async Task BackplaneRecoversAfterListenerConnectionIsTerminated()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -22,7 +22,7 @@ public class ListenerConnectionTerminationTests(ContainerFixture fixture) : Resi
         await AssertEventuallyDeliveredAsync(client1, client2);
     }
 
-    [RetryFact]
+    [Fact]
     public async Task BackplaneRecoversFromRepeatedDisruptions()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -37,7 +37,7 @@ public class ListenerConnectionTerminationTests(ContainerFixture fixture) : Resi
         }
     }
 
-    [RetryFact]
+    [Fact]
     public async Task GroupSubscriptionSurvivesReconnect()
     {
         await using var member = await Server1.CreateClientAsync();
@@ -53,7 +53,7 @@ public class ListenerConnectionTerminationTests(ContainerFixture fixture) : Resi
         await AssertEventuallyDeliveredAsync(() => sender.Send.SendToAllInGroup(GroupName, Guid.NewGuid().ToString()), member, nameof(IClient.Message));
     }
 
-    [RetryFact]
+    [Fact]
     public async Task InvokeRecoversAfterReconnect()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -77,7 +77,7 @@ public class ListenerConnectionTerminationTests(ContainerFixture fixture) : Resi
         Assert.Equal($"echo:{ShortMessage}", result);
     }
 
-    [RetryFact]
+    [Fact]
     public async Task NewConnectionEstablishedDuringDisruptionEventuallyWorks()
     {
         await using var existingClient = await Server1.CreateClientAsync();

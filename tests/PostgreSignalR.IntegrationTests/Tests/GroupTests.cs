@@ -4,7 +4,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
 {
-    [RetryFact]
+    [Fact]
     public async Task Group_RemovalStopsDelivery()
     {
         await using var member1 = await Server1.CreateClientAsync();
@@ -23,7 +23,7 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
         await member2.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Groups_SendToAllInGroupsHitsMembersOfEachGroup()
     {
         await using var sender = await Server1.CreateClientAsync();
@@ -51,7 +51,7 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
         await outsider.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Groups_OthersInGroupExcludesCaller()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -71,7 +71,7 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
         await outsider.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 
-    [RetryFact]
+    [Fact]
     public async Task Groups_GroupExceptExcludesSpecifiedConnection()
     {
         await using var sender = await Server1.CreateClientAsync();
