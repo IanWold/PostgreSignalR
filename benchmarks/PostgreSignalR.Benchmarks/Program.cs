@@ -9,10 +9,19 @@ using Microsoft.AspNetCore.SignalR.Client;
 static string Env(string key, string fallback) =>
     Environment.GetEnvironmentVariable(key) ?? fallback;
 
-var serverA = Env("SERVER_A", "http://servera:8080");
-var serverB = Env("SERVER_B", "http://serverb:8080");
+var numServers = int.Parse(Env("NUM_SERVERS", "2"));
 
-var clients = int.Parse(Env("CLIENTS", "500"));
+if (numServers is < 2 or > 10)
+{
+    throw new Exception($"NUM_SERVERS must be between 2 and 10 (the number of server slots defined in docker-compose.yml), got {numServers}.");
+}
+
+var serverUrls = Enumerable.Range(1, numServers).Select(i => $"http://server{i}:8080").ToList();
+var publisherUrl = serverUrls[0];
+var subscriberUrls = serverUrls.Skip(1).ToList();
+
+var clientsPerServer = int.Parse(Env("CLIENTS_PER_SERVER", "500"));
+var clients = clientsPerServer * subscriberUrls.Count;
 var publishCount = int.Parse(Env("PUBLISH_COUNT", "20000"));
 var concurrency = int.Parse(Env("CONCURRENCY", "128"));
 var payloadBytes = int.Parse(Env("PAYLOAD_BYTES", "128"));
@@ -34,19 +43,17 @@ var repeatsPerRate = int.Parse(Env("REPEATS_PER_RATE", "1"));
 
 Console.WriteLine();
 Console.WriteLine("Benchmark Starting...");
-Console.WriteLine($"ServerA: {serverA}");
-Console.WriteLine($"ServerB: {serverB}");
-Console.WriteLine($"Clients: {clients}");
+Console.WriteLine($"Servers ({numServers}): {string.Join(", ", serverUrls)}");
+Console.WriteLine($"Publisher: {publisherUrl}");
+Console.WriteLine($"Subscribers: {string.Join(", ", subscriberUrls)}");
+Console.WriteLine($"Clients: {clients} ({clientsPerServer} per subscriber)");
 Console.WriteLine($"PublishCount: {publishCount}, Concurrency: {concurrency}, PayloadBytes: {payloadBytes}");
 Console.WriteLine($"WarmupSeconds: {warmupSeconds}, MeasureSeconds: {measureSeconds}");
 Console.WriteLine($"RepeatsPerRate: {repeatsPerRate}");
 
 using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 
-await WaitHealthy(http, serverA);
-await WaitHealthy(http, serverB);
-
-var hubUrl = $"{serverB.TrimEnd('/')}/hub";
+await Task.WhenAll(serverUrls.Select(url => WaitHealthy(http, url)));
 
 var connections = new List<HubConnection>(clients);
 
@@ -58,6 +65,7 @@ var measuring = false;
 
 for (int i = 0; i < clients; i++)
 {
+    var hubUrl = $"{subscriberUrls[i % subscriberUrls.Count].TrimEnd('/')}/hub";
     var connection = new HubConnectionBuilder().WithUrl(hubUrl).WithAutomaticReconnect().Build();
 
     connection.On<Message>("bench", message =>
@@ -82,7 +90,7 @@ for (int i = 0; i < clients; i++)
     connections.Add(connection);
 }
 
-Console.WriteLine($"Connecting {clients} clients to {hubUrl}...");
+Console.WriteLine($"Connecting {clients} clients ({clientsPerServer} each) across {subscriberUrls.Count} subscriber(s)...");
 await Task.WhenAll(connections.Select(c => c.StartAsync()));
 Console.WriteLine("Clients connected.");
 
@@ -90,7 +98,7 @@ Console.WriteLine($"Measurement mode: {mode}");
 Console.WriteLine();
 
 Console.WriteLine($"Warmup: {warmupSeconds}s");
-await Publish(http, serverA, publishCount: Math.Min(2000, publishCount / 10), concurrency: Math.Max(8, concurrency / 4), payloadBytes);
+await Publish(http, publisherUrl, publishCount: Math.Min(2000, publishCount / 10), concurrency: Math.Max(8, concurrency / 4), payloadBytes);
 await Task.Delay(TimeSpan.FromSeconds(warmupSeconds));
 
 if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
@@ -99,7 +107,7 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
     {
         var result = await RunTrialAsync(
             http,
-            serverA,
+            publisherUrl,
             rate,
             sweepTrialSeconds,
             repeatsPerRate,
@@ -177,7 +185,7 @@ else
 
     var result = await RunTrialAsync(
         http,
-        serverA,
+        publisherUrl,
         targetRate,
         measureSeconds,
         repeatsPerRate,
@@ -211,9 +219,9 @@ Console.WriteLine("Disconnecting clients...");
 await Task.WhenAll(connections.Select(c => c.DisposeAsync().AsTask()));
 Console.WriteLine("Done.");
 
-static async Task Publish(HttpClient http, string serverA, int publishCount, int concurrency, int payloadBytes)
+static async Task Publish(HttpClient http, string publisherUrl, int publishCount, int concurrency, int payloadBytes)
 {
-    var response = await http.PostAsJsonAsync($"{serverA.TrimEnd('/')}/publish", new
+    var response = await http.PostAsJsonAsync($"{publisherUrl.TrimEnd('/')}/publish", new
     {
         PublishCount = publishCount,
         Concurrency = concurrency,
@@ -258,7 +266,7 @@ static (long p50, long p95, long p99, long max) GetPercentiles(LongHistogram his
 
 static async Task<TrialResult> RunTrialAsync(
     HttpClient http,
-    string serverA,
+    string publisherUrl,
     int targetRateMsgsPerSec,
     int trialSeconds,
     int repeats,
@@ -299,7 +307,7 @@ static async Task<TrialResult> RunTrialAsync(
         {
             var thisBatch = Math.Min(batchSize, totalToSend - sent);
 
-            inFlight.Add(Publish(http, serverA, thisBatch, concurrency, payloadBytes));
+            inFlight.Add(Publish(http, publisherUrl, thisBatch, concurrency, payloadBytes));
 
             next += (long)(batchPeriod.TotalSeconds * tickFreq);
             var now = Stopwatch.GetTimestamp();

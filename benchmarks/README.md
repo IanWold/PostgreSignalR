@@ -7,7 +7,7 @@ The benchmarks use four projects:
 * [PostgreSignalR.Benchmarks.SharedLoad](https://github.com/IanWold/PostgreSignalR/tree/main/benchmarks/PostgreSignalR.Benchmarks.SharedLoad) optionally simulates other traffic on the backplane's Postgres/Redis instance, unrelated to SignalR.
 * [PostgreSignalR.Benchmarks.Abstractions](https://github.com/IanWold/PostgreSignalR/tree/main/benchmarks/PostgreSignalR.Benchmarks.Abstractions) is a shared class.
 
-The benchmarks are run through docker compose. The docker-compose yml will create containers for postgres and redis, two server containers, the shared-load generator, and one driver container which will run the benchmarks. The benchmarks can run either the Redis or Postgres backplanes.
+The benchmarks are run through docker compose. The docker-compose yml will create containers for postgres and redis, 10 fixed server slots (`server1`-`server10`), the shared-load generator, and one driver container which will run the benchmarks. The benchmarks can run either the Redis or Postgres backplanes.
 
 ```
 BACKPLANE=postgres MODE=sweep docker compose up --build --abort-on-container-exit --exit-code-from driver
@@ -21,7 +21,8 @@ There are two modes it can run in:
 
 The other variables you can specify:
 
-* `CLIENTS`: the number of clients to connect.
+* `NUM_SERVERS`: the number of server nodes to spread the backplane fanout across, from 2 to 10 (docker-compose.yml defines 10 fixed slots, `server1`-`server10`; raise the ceiling there if you need more). `server1` is always the sole publish target; the rest are subscribers, each getting `CLIENTS_PER_SERVER` connections. This lets you test whether fanout latency degrades as the number of subscribing nodes grows, separately from load on any one node. Default 2 (one publisher, one subscriber - the original topology).
+* `CLIENTS_PER_SERVER`: the number of clients to connect to *each* subscriber node. Total clients connected = `CLIENTS_PER_SERVER * (NUM_SERVERS - 1)`, so every subscriber always carries equal load - raising `NUM_SERVERS` raises total client count too. Default 500.
 * `PUBLISH_COUNT`: The number of messages to publish. Default 20000.
 * `CONCURRENCY`: The maximum number of concurrent `SendAsync` calls in flight on the server at any time, for the lifetime of the run. Default 128.
 * `PAYLOAD_BYTES`: The number of bytes of filler content included in each message's payload. Default 128.
