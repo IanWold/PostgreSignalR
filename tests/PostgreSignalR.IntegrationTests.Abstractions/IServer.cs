@@ -21,6 +21,8 @@ public interface IServer
     Task SendToUser(string userId, string message);
     Task SendToUsers(string[] userIds, string message);
     Task<string> InvokeConnectionEcho(string connectionId, string message);
+    Task<string> InvokeConnectionEchoWithError(string connectionId, string message);
+    Task<string> InvokeConnectionEchoSlow(string connectionId, string message, int delayMs);
 
     #region SimpleObject
 

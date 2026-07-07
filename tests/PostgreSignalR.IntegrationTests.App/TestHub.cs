@@ -65,6 +65,12 @@ public class TestHub : Hub<IClient>, IServer
     public async Task<string> InvokeConnectionEcho(string connectionId, string message) =>
         await Clients.Client(connectionId).EchoBack(message);
 
+    public async Task<string> InvokeConnectionEchoWithError(string connectionId, string message) =>
+        await Clients.Client(connectionId).EchoBackWithError(message);
+
+    public async Task<string> InvokeConnectionEchoSlow(string connectionId, string message, int delayMs) =>
+        await Clients.Client(connectionId).EchoBackSlow(message, delayMs);
+
     #region SimpleObject
 
     public async Task SendToAll_SimpleObject(SimpleObject obj) =>
