@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.DependencyInjection;
 using PostgreSignalR.IntegrationTests.Abstractions;
 using TypedSignalR.Client;
 
@@ -51,14 +52,18 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
         await connection.StartAsync(cts.Token);
     }
 
-    public static async Task<TestClient> CreateAsync(Uri address, string? user = null)
+    public static async Task<TestClient> CreateAsync(Uri address, string? user = null, bool useMessagePack = false)
     {
-        var client = new TestClient(
-            new HubConnectionBuilder()
-                .WithUrl(AddUser(address, user))
-                .WithAutomaticReconnect()
-                .Build()
-        );
+        var builder = new HubConnectionBuilder()
+            .WithUrl(AddUser(address, user))
+            .WithAutomaticReconnect();
+
+        if (useMessagePack)
+        {
+            builder.AddMessagePackProtocol();
+        }
+
+        var client = new TestClient(builder.Build());
 
         try
         {

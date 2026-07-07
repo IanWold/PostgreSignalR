@@ -2,9 +2,9 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class TestServer(TestServerContainer container) : IAsyncDisposable
 {
-    public async Task<TestClient> CreateClientAsync(string? user = null, bool waitForHealthy = true)
+    public async Task<TestClient> CreateClientAsync(string? user = null, bool waitForHealthy = true, bool useMessagePack = false)
     {
-        var client = await TestClient.CreateAsync(container.HubUri, user);
+        var client = await TestClient.CreateAsync(container.HubUri, user, useMessagePack);
 
         if (!waitForHealthy)
         {
