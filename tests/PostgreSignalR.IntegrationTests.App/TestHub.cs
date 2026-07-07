@@ -32,6 +32,12 @@ public class TestHub : Hub<IClient>, IServer
     public async Task LeaveGroup(string groupName) =>
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
 
+    public async Task AddConnectionToGroup(string connectionId, string groupName) =>
+        await Groups.AddToGroupAsync(connectionId, groupName);
+
+    public async Task RemoveConnectionFromGroup(string connectionId, string groupName) =>
+        await Groups.RemoveFromGroupAsync(connectionId, groupName);
+
     public async Task SendToAllInGroup(string groupName, string message) =>
         await Clients.Group(groupName).Message(message);
 
