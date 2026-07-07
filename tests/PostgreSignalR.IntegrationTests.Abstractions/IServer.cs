@@ -10,6 +10,8 @@ public interface IServer
     Task<string> GetConnectionId();
     Task JoinGroup(string groupName);
     Task LeaveGroup(string groupName);
+    Task AddConnectionToGroup(string connectionId, string groupName);
+    Task RemoveConnectionFromGroup(string connectionId, string groupName);
     Task SendToAllInGroup(string groupName, string message);
     Task SendToAllInGroups(string[] groupNames, string message);
     Task SendToOthersInGroup(string groupName, string message);
