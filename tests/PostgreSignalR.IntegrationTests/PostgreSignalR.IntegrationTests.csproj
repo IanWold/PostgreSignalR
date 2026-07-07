@@ -20,11 +20,6 @@
     <PackageReference Include="xRetry.v3" Version="1.0.0-rc3" />
   </ItemGroup>
 
-  <!-- Pinned per-TFM, and kept in lockstep with each other - SignalR.Client and
-       Protocols.MessagePack must resolve to the SAME version, or the MessagePack protocol
-       assembly (compiled against one version's IInvocationBinder shape) gets loaded against a
-       different version's SignalR.Common at runtime, throwing MissingMethodException on
-       IInvocationBinder.GetTarget the moment a MessagePack-encoded message is parsed. -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.28" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="8.0.28" />
