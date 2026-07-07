@@ -16,6 +16,7 @@ var payloadTableConfiguration = builder.Configuration.GetSection("PayloadTable")
 var useTableStrategy = builder.Configuration.GetValue("UseTableStrategy", true);
 
 var signalRBuilder = builder.Services.AddSignalR()
+    .AddMessagePackProtocol()
     .AddPostgresBackplane(new NpgsqlDataSourceBuilder(postgresConnectionString).Build(), o =>
     {
         backplaneConfiguration.Bind(o);
