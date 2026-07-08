@@ -57,6 +57,8 @@ var sweepTrialSeconds = int.Parse(Env("SWEEP_TRIAL_SECONDS", "15"));
 var batchSize = int.Parse(Env("BATCH_SIZE", "25"));
 var repeatsPerRate = int.Parse(Env("REPEATS_PER_RATE", "1"));
 
+var healthCheckTimeoutSeconds = int.Parse(Env("HEALTH_CHECK_TIMEOUT_SECONDS", "60"));
+
 Console.WriteLine();
 Console.WriteLine("Benchmark Starting...");
 Console.WriteLine($"Servers ({serverUrls.Count}): {string.Join(", ", serverUrls)}");
@@ -66,10 +68,11 @@ Console.WriteLine($"Clients: {clients} ({clientsPerServer} per subscriber)");
 Console.WriteLine($"PublishCount: {publishCount}, Concurrency: {concurrency}, PayloadBytes: {payloadBytes}");
 Console.WriteLine($"WarmupSeconds: {warmupSeconds}, MeasureSeconds: {measureSeconds}");
 Console.WriteLine($"RepeatsPerRate: {repeatsPerRate}");
+Console.WriteLine($"HealthCheckTimeoutSeconds: {healthCheckTimeoutSeconds}");
 
 using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 
-await Task.WhenAll(serverUrls.Select(url => WaitHealthy(http, url)));
+await Task.WhenAll(serverUrls.Select(url => WaitHealthy(http, url, healthCheckTimeoutSeconds)));
 
 var connections = new List<HubConnection>(clients);
 
@@ -247,9 +250,9 @@ static async Task Publish(HttpClient http, string publisherUrl, int publishCount
     response.EnsureSuccessStatusCode();
 }
 
-static async Task WaitHealthy(HttpClient http, string baseUrl)
+static async Task WaitHealthy(HttpClient http, string baseUrl, int timeoutSeconds)
 {
-    for (int i = 0; i < 60; i++)
+    for (int i = 0; i < timeoutSeconds; i++)
     {
         try
         {
@@ -264,7 +267,7 @@ static async Task WaitHealthy(HttpClient http, string baseUrl)
         await Task.Delay(1000);
     }
 
-    throw new Exception($"Health check failed for {baseUrl}");
+    throw new Exception($"Health check failed for {baseUrl} after {timeoutSeconds}s");
 }
 
 static (long p50, long p95, long p99, long max) GetPercentiles(LongHistogram hist)

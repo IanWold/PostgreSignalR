@@ -30,6 +30,7 @@ The other variables you can specify:
 * `WARMUP_SECONDS`: The number of seconds to warm up. Default 10.
 * `MEASURE_SECONDS`: For `single` runs, the number of seconds to measure. Messages/second will be `PUBLISH_COUNT / MEASURE_SECONDS`.
 * `REPEATS_PER_RATE`: The number of independent trials to run at each rate (each rate in a `sweep`, or the single trial in `single` mode). Latency percentiles are computed over the pooled samples from all repeats; `Sent`/`Missing`/`Fanout Copies` are summed. Default 1.
+* `HEALTH_CHECK_TIMEOUT_SECONDS`: How long the driver waits (polling once per second) for each server's `/health` endpoint before giving up and failing the run. Default 60.
 * `PAYLOAD_STRATEGY`: Only applies when `BACKPLANE=postgres`
     * `event` (default) sends payloads inline in the notification event.
     * `table` uses PostgreSignalR's payload table strategy instead (`AddBackplaneTablePayloadStrategy` with `StorageMode=Always`).
