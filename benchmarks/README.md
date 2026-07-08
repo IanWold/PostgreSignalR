@@ -60,3 +60,11 @@ BACKPLANE=redis SIMULATE_SHARED_LOAD=true MODE=sweep docker compose up --build -
 # Shared Postgres backplane
 BACKPLANE=postgres SIMULATE_SHARED_LOAD=true MODE=sweep docker compose up --build --abort-on-container-exit --exit-code-from driver
 ```
+
+## Recreating all my Benchmarks
+
+I generated `run-comparisons.sh` to run a set of 10 predefined scenarios that I think give a good comparison across several different use cases. Each scenario takes 30 minuets to run, so the whole suite takes a little over 5 hours.
+
+If you're just interested in running certain scenarios, you can execute `run-comparisons.sh --list` to see all of them and list scenarios out to run, like `run-comparisons.sh redis-dedicated postgres-shared`.
+
+Logs are saved to `results/<timestamp>/<scenario>.log`
