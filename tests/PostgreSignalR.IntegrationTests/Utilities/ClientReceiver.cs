@@ -10,6 +10,15 @@ public class ClientReceiver(Func<string, object?[], Task> callback) : IClient
     public Task<string> EchoBack(string message) =>
         Task.FromResult($"echo:{message}");
 
+    public Task<string> EchoBackWithError(string message) =>
+        throw new InvalidOperationException($"Simulated callee failure for '{message}'.");
+
+    public async Task<string> EchoBackSlow(string message, int delayMs)
+    {
+        await Task.Delay(delayMs);
+        return $"echo:{message}";
+    }
+
     public Task MessageSimpleObject(SimpleObject obj) =>
         callback(nameof(IClient.MessageSimpleObject), [obj]);
 

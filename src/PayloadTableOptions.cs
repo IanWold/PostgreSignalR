@@ -26,7 +26,7 @@ public class PayloadTableOptions
     /// Configures how the table is used to store payloads.
     /// Possible values:
     /// <list type="bullet">
-    ///     <item><see cref="PayloadTableStorage.Auto"/>: Uses the event payload if the payload is less than 8000 bytes, otherwise uses a table to store payloads</item>
+    ///     <item><see cref="PayloadTableStorage.Auto"/>: Uses the event payload if the payload is less than 6000 bytes, otherwise uses a table to store payloads</item>
     ///     <item><see cref="PayloadTableStorage.Always"/>: Always uses a table to store payloads</item>
     /// </list>
     /// Default: <see cref="PayloadTableStorage.Auto"/>

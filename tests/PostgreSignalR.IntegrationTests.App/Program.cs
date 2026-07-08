@@ -15,7 +15,8 @@ var backplaneConfiguration = builder.Configuration.GetSection("Backplane");
 var payloadTableConfiguration = builder.Configuration.GetSection("PayloadTable");
 var useTableStrategy = builder.Configuration.GetValue("UseTableStrategy", true);
 
-var signalRBuilder = builder.Services.AddSignalR()
+var signalRBuilder = builder.Services.AddSignalR(o => o.EnableDetailedErrors = true)
+    .AddMessagePackProtocol()
     .AddPostgresBackplane(new NpgsqlDataSourceBuilder(postgresConnectionString).Build(), o =>
     {
         backplaneConfiguration.Bind(o);
