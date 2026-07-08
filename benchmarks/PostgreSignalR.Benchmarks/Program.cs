@@ -78,7 +78,13 @@ var connections = new List<HubConnection>(clients);
 
 var seen = new ConcurrentDictionary<string, byte>(Environment.ProcessorCount, publishCount);
 var fanoutCopies = new Counter();
-var histogram = new LongHistogram(60000000, 3);
+
+var histogram = HistogramFactory.With64BitBucketSize()
+    .WithValuesUpTo(60000000)
+    .WithPrecisionOf(3)
+    .WithThreadSafeWrites()
+    .WithThreadSafeReads()
+    .Create();
 
 var measuring = false;
 
@@ -100,10 +106,7 @@ for (int i = 0; i < clients; i++)
             return;
         }
 
-        lock (histogram)
-        {
-            histogram.RecordValue(Math.Min(Math.Max((DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.SentUnixTimeMs) * 1000, 0), 60000000));
-        }
+        histogram.RecordValue(Math.Min(Math.Max((DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.SentUnixTimeMs) * 1000, 0), 60000000));
     });
 
     connections.Add(connection);
@@ -272,15 +275,12 @@ static async Task WaitHealthy(HttpClient http, string baseUrl, int timeoutSecond
 
 static (long p50, long p95, long p99, long max) GetPercentiles(LongHistogram hist)
 {
-    lock (hist)
-    {
-        var p50 = hist.GetValueAtPercentile(50);
-        var p95 = hist.GetValueAtPercentile(95);
-        var p99 = hist.GetValueAtPercentile(99);
-        var max = hist.GetMaxValue();
+    var p50 = hist.GetValueAtPercentile(50);
+    var p95 = hist.GetValueAtPercentile(95);
+    var p99 = hist.GetValueAtPercentile(99);
+    var max = hist.GetMaxValue();
 
-        return (p50, p95, p99, max);
-    }
+    return (p50, p95, p99, max);
 }
 
 static async Task<TrialResult> RunTrialAsync(
@@ -294,7 +294,7 @@ static async Task<TrialResult> RunTrialAsync(
     int batchSize,
     ConcurrentDictionary<string, byte> seen,
     Counter fanoutCopies,
-    LongHistogram hist,
+    Recorder hist,
     Action<bool> setMeasuring
 )
 {
@@ -309,7 +309,6 @@ static async Task<TrialResult> RunTrialAsync(
     {
         seen.Clear();
         Interlocked.Exchange(ref fanoutCopies.Value, 0);
-        lock (hist) hist.Reset();
 
         setMeasuring(true);
 
@@ -358,7 +357,7 @@ static async Task<TrialResult> RunTrialAsync(
         totalFanoutCopies += Interlocked.Read(ref fanoutCopies.Value);
         totalElapsedSec += sw.Elapsed.TotalSeconds;
 
-        lock (hist) pooledHist.Add(hist);
+        pooledHist.Add(hist.GetIntervalHistogram());
     }
 
     var missing = Math.Max(0, totalSent - totalUnique);
