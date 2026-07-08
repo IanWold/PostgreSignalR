@@ -8,7 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRouting();
 builder.Services.AddSignalR();
 
-var backplane = (Environment.GetEnvironmentVariable("BACKPLANE") ?? throw new Exception()).ToLowerInvariant();
+var backplane = (Environment.GetEnvironmentVariable("BACKPLANE") ?? "redis").ToLowerInvariant();
 
 var usePayloadTable = (Environment.GetEnvironmentVariable("PAYLOAD_STRATEGY") ?? "event").Equals("table", StringComparison.OrdinalIgnoreCase);
 
