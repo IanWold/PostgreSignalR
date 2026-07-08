@@ -21,7 +21,8 @@ There are two modes it can run in:
 
 The other variables you can specify:
 
-* `NUM_SERVERS`: the number of server nodes to spread the backplane fanout across, from 2 to 10 (docker-compose.yml defines 10 fixed slots, `server1`-`server10`; raise the ceiling there if you need more). `server1` is always the sole publish target; the rest are subscribers, each getting `CLIENTS_PER_SERVER` connections. This lets you test whether fanout latency degrades as the number of subscribing nodes grows, separately from load on any one node. Default 2 (one publisher, one subscriber - the original topology).
+* `NUM_SERVERS`: the number of server nodes to spread the backplane fanout across, from 2 to 10 (docker-compose.yml defines 10 fixed slots, `server1`-`server10`; raise the ceiling there if you need more). `server1` is always the sole publish target; the rest are subscribers, each getting `CLIENTS_PER_SERVER` connections. This lets you test whether fanout latency degrades as the number of subscribing nodes grows, separately from load on any one node. Default 2 (one publisher, one subscriber). Ignored if `SERVER_URLS` is set.
+* `SERVER_URLS`: a comma-separated list of server base URLs to use instead of the `server1..serverN` docker-compose naming (e.g. `https://bench-server-1.example.com,https://bench-server-2.example.com`). Use this to point the driver at servers deployed somewhere other than this docker-compose setup (i.e. cloud provider). The first URL is always the publish target; the rest are subscribers, same as `NUM_SERVERS`. At least 2 URLs are required.
 * `CLIENTS_PER_SERVER`: the number of clients to connect to *each* subscriber node. Total clients connected = `CLIENTS_PER_SERVER * (NUM_SERVERS - 1)`, so every subscriber always carries equal load - raising `NUM_SERVERS` raises total client count too. Default 500.
 * `PUBLISH_COUNT`: The number of messages to publish. Default 20000.
 * `CONCURRENCY`: The maximum number of concurrent `SendAsync` calls in flight on the server at any time, for the lifetime of the run. Default 128.
@@ -34,6 +35,10 @@ The other variables you can specify:
     * `table` uses PostgreSignalR's payload table strategy instead (`AddBackplaneTablePayloadStrategy` with `StorageMode=Always`).
 
 The `sweep` output table's `Rate (msg/s)` column is the offered rate, i.e. what the driver was asked to send - it is not necessarily what was achieved. The `Achieved (msg/s)` column is the rate actually measured (messages sent / actual dispatch time), which falls below the target once the driver or server can't keep up. When achieved rate drops more than 5% below target, a warning is printed, since the latency figures on that row reflect the achieved rate, not the labeled one. The same applies to `single` mode's `Sent ... achieved` line.
+
+## Connection strings
+
+`ConnectionStrings__Postgres` and `ConnectionStrings__Redis` accept either the native keyword=value formats Npgsql/StackExchange.Redis expect, or a `postgres://`/`postgresql://` and `redis://`/`rediss://` URI - the format most cloud providers  hand out as `DATABASE_URL`/`REDIS_URL`. URIs are converted automatically (`rediss://` and a Postgres URI's `sslmode` query param both map through correctly); values already in native format are passed through unchanged, so the local docker-compose setup is unaffected. This lets `server`, `shared-load`, and the driver's backplane connections point at a real managed database instead of the containers the compose file provisions.
 
 ## Dedicated vs. Shared Backplane
 

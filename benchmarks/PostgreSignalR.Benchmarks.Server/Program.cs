@@ -14,12 +14,12 @@ var usePayloadTable = (Environment.GetEnvironmentVariable("PAYLOAD_STRATEGY") ??
 
 if (backplane is "redis")
 {
-    var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Redis") ?? throw new Exception();
+    var connectionString = ConnectionStringHelper.NormalizeRedis(Environment.GetEnvironmentVariable("ConnectionStrings__Redis") ?? throw new Exception());
     builder.Services.AddSignalR().AddStackExchangeRedis(connectionString);
 }
 else if (backplane is "postgres")
 {
-    var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception();
+    var connectionString = ConnectionStringHelper.NormalizePostgres(Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception());
     var signalrBuilder = builder.Services.AddSignalR().AddPostgresBackplane(connectionString);
 
     if (usePayloadTable)

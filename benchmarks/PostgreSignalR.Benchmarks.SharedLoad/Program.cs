@@ -1,5 +1,6 @@
 using Npgsql;
 using StackExchange.Redis;
+using PostgreSignalR.Benchmarks.Abstractions;
 
 var backplane = (Environment.GetEnvironmentVariable("BACKPLANE") ?? "none").ToLowerInvariant();
 var enabled = string.Equals(Environment.GetEnvironmentVariable("SIMULATE_SHARED_LOAD"), "true", StringComparison.OrdinalIgnoreCase);
@@ -32,7 +33,7 @@ _ = Task.Run(async () =>
 
 if (backplane is "postgres")
 {
-    var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception("Postgres connection string required.");
+    var connectionString = ConnectionStringHelper.NormalizePostgres(Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception("Postgres connection string required."));
 
     await using var dataSource = NpgsqlDataSource.Create(connectionString);
     await using (var setup = dataSource.CreateCommand("CREATE TABLE IF NOT EXISTS shared_load_rows (id BIGSERIAL PRIMARY KEY, payload TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())"))
@@ -46,7 +47,7 @@ if (backplane is "postgres")
 }
 else if (backplane is "redis")
 {
-    var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Redis") ?? throw new Exception("Redis connection string required.");
+    var connectionString = ConnectionStringHelper.NormalizeRedis(Environment.GetEnvironmentVariable("ConnectionStrings__Redis") ?? throw new Exception("Redis connection string required."));
     var redis = await ConnectionMultiplexer.ConnectAsync(connectionString);
     var db = redis.GetDatabase();
     var workers = Enumerable.Range(0, concurrency).Select(_ => RunRedisWorkerAsync(db));

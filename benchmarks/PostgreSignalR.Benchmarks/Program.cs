@@ -9,14 +9,30 @@ using Microsoft.AspNetCore.SignalR.Client;
 static string Env(string key, string fallback) =>
     Environment.GetEnvironmentVariable(key) ?? fallback;
 
-var numServers = int.Parse(Env("NUM_SERVERS", "2"));
+var serverUrlsEnv = Environment.GetEnvironmentVariable("SERVER_URLS");
+List<string> serverUrls;
 
-if (numServers is < 2 or > 10)
+if (!string.IsNullOrWhiteSpace(serverUrlsEnv))
 {
-    throw new Exception($"NUM_SERVERS must be between 2 and 10 (the number of server slots defined in docker-compose.yml), got {numServers}.");
+    serverUrls = serverUrlsEnv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+    if (serverUrls.Count < 2)
+    {
+        throw new Exception($"SERVER_URLS must list at least 2 servers (one publisher, one subscriber), got {serverUrls.Count}.");
+    }
+}
+else
+{
+    var numServers = int.Parse(Env("NUM_SERVERS", "2"));
+
+    if (numServers is < 2 or > 10)
+    {
+        throw new Exception($"NUM_SERVERS must be between 2 and 10 (the number of server slots defined in docker-compose.yml), got {numServers}.");
+    }
+
+    serverUrls = Enumerable.Range(1, numServers).Select(i => $"http://server{i}:8080").ToList();
 }
 
-var serverUrls = Enumerable.Range(1, numServers).Select(i => $"http://server{i}:8080").ToList();
 var publisherUrl = serverUrls[0];
 var subscriberUrls = serverUrls.Skip(1).ToList();
 
@@ -43,7 +59,7 @@ var repeatsPerRate = int.Parse(Env("REPEATS_PER_RATE", "1"));
 
 Console.WriteLine();
 Console.WriteLine("Benchmark Starting...");
-Console.WriteLine($"Servers ({numServers}): {string.Join(", ", serverUrls)}");
+Console.WriteLine($"Servers ({serverUrls.Count}): {string.Join(", ", serverUrls)}");
 Console.WriteLine($"Publisher: {publisherUrl}");
 Console.WriteLine($"Subscribers: {string.Join(", ", subscriberUrls)}");
 Console.WriteLine($"Clients: {clients} ({clientsPerServer} per subscriber)");

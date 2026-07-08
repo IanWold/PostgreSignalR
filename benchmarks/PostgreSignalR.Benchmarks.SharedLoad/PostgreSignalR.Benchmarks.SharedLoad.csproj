@@ -12,4 +12,8 @@
     <PackageReference Include="StackExchange.Redis" Version="2.7.27" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../PostgreSignalR.Benchmarks.Abstractions/PostgreSignalR.Benchmarks.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>
