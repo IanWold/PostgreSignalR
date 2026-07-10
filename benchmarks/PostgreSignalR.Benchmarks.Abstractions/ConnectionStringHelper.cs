@@ -40,9 +40,21 @@ public static class ConnectionStringHelper
         {
             var parts = pair.Split('=', 2);
 
-            if (parts.Length == 2 && Uri.UnescapeDataString(parts[0]).Equals("sslmode", StringComparison.OrdinalIgnoreCase))
+            if (parts.Length != 2)
             {
-                builder.SslMode = Enum.Parse<SslMode>(Uri.UnescapeDataString(parts[1]), ignoreCase: true);
+                continue;
+            }
+
+            var key = Uri.UnescapeDataString(parts[0]);
+            var val = Uri.UnescapeDataString(parts[1]);
+
+            if (key.Equals("sslmode", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.SslMode = Enum.Parse<SslMode>(val, ignoreCase: true);
+            }
+            else
+            {
+                builder[key] = val;
             }
         }
 
