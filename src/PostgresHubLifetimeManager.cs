@@ -39,7 +39,6 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
     private readonly PostgresBackplaneOptions _options;
     private readonly string _serverName = GenerateServerName();
     private readonly PostgresProtocol _protocol;
-    private readonly SemaphoreSlim _commandLock = new(1);
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
     private readonly ConcurrentDictionary<string, Action<byte[]>> _notificationHandlers = new(StringComparer.Ordinal);
     private readonly ClientResultsManager _clientResultsManager = new();
@@ -377,7 +376,6 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
     {
         _logger.BackplanePublishing(channel);
 
-        await _commandLock.WaitAsync();
         try
         {
             await _payloadStrategy.NotifyAsync(channel, message);
@@ -386,10 +384,6 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         {
             _logger.BackplaneUnableToConnect(ex);
             throw;
-        }
-        finally
-        {
-            _commandLock.Release();
         }
     }
 
