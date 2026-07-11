@@ -5,6 +5,7 @@ using PostgreSignalR.Benchmarks.Abstractions;
 using PostgreSignalR.Benchmarks;
 using HdrHistogram;
 using Microsoft.AspNetCore.SignalR.Client;
+using Npgsql;
 
 static string Env(string key, string fallback) =>
     Environment.GetEnvironmentVariable(key) ?? fallback;
@@ -62,6 +63,9 @@ var healthCheckTimeoutSeconds = int.Parse(Env("HEALTH_CHECK_TIMEOUT_SECONDS", "6
 var drainQuietSeconds = double.Parse(Env("DRAIN_QUIET_SECONDS", "1"));
 var drainMaxWaitSeconds = double.Parse(Env("DRAIN_MAX_WAIT_SECONDS", "60"));
 
+var backplane = Env("BACKPLANE", "redis").ToLowerInvariant();
+var payloadStrategy = Env("PAYLOAD_STRATEGY", "event").ToLowerInvariant();
+
 Console.WriteLine();
 Console.WriteLine("Benchmark Starting...");
 Console.WriteLine($"Servers ({serverUrls.Count}): {string.Join(", ", serverUrls)}");
@@ -77,6 +81,19 @@ Console.WriteLine($"HealthCheckTimeoutSeconds: {healthCheckTimeoutSeconds}");
 using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 
 await Task.WhenAll(serverUrls.Select(url => WaitHealthy(http, url, healthCheckTimeoutSeconds)));
+
+if (backplane is "postgres" && payloadStrategy is "table")
+{
+    var postgresConnectionString = ConnectionStringHelper.NormalizePostgres(Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception("ConnectionStrings__Postgres is required when BACKPLANE=postgres"));
+
+    Console.WriteLine("Clearing backplane_payloads table before starting...");
+
+    await using var connection = new NpgsqlConnection(postgresConnectionString);
+    await connection.OpenAsync();
+    
+    await using var command = new NpgsqlCommand("TRUNCATE TABLE \"backplane_payloads\";", connection);
+    await command.ExecuteNonQueryAsync();
+}
 
 var connections = new List<HubConnection>(clients);
 
