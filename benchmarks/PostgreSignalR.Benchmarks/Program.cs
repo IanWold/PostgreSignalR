@@ -59,6 +59,9 @@ var repeatsPerRate = int.Parse(Env("REPEATS_PER_RATE", "1"));
 
 var healthCheckTimeoutSeconds = int.Parse(Env("HEALTH_CHECK_TIMEOUT_SECONDS", "60"));
 
+var drainQuietSeconds = double.Parse(Env("DRAIN_QUIET_SECONDS", "1"));
+var drainMaxWaitSeconds = double.Parse(Env("DRAIN_MAX_WAIT_SECONDS", "60"));
+
 Console.WriteLine();
 Console.WriteLine("Benchmark Starting...");
 Console.WriteLine($"Servers ({serverUrls.Count}): {string.Join(", ", serverUrls)}");
@@ -67,6 +70,7 @@ Console.WriteLine($"Subscribers: {string.Join(", ", subscriberUrls)}");
 Console.WriteLine($"Clients: {clients} ({clientsPerServer} per subscriber)");
 Console.WriteLine($"PublishCount: {publishCount}, Concurrency: {concurrency}, PayloadBytes: {payloadBytes}");
 Console.WriteLine($"WarmupSeconds: {warmupSeconds}, MeasureSeconds: {measureSeconds}");
+Console.WriteLine($"DrainQuietSeconds: {drainQuietSeconds}, DrainMaxWaitSeconds: {drainMaxWaitSeconds}");
 Console.WriteLine($"RepeatsPerRate: {repeatsPerRate}");
 Console.WriteLine($"HealthCheckTimeoutSeconds: {healthCheckTimeoutSeconds}");
 
@@ -80,6 +84,8 @@ var seen = new ConcurrentDictionary<string, byte>(Environment.ProcessorCount, pu
 var fanoutCopies = new Counter();
 var negativeLatency = new Counter();
 var generation = new Counter();
+var staleGeneration = new Counter();
+var lastStaleTicks = new Counter();
 
 var histogram = HistogramFactory.With64BitBucketSize()
     .WithValuesUpTo(60000000)
@@ -97,7 +103,14 @@ for (int i = 0; i < clients; i++)
 
     connection.On<Message>("bench", message =>
     {
-        if (!measuring || message.Generation != Interlocked.Read(ref generation.Value))
+        if (message.Generation != Interlocked.Read(ref generation.Value))
+        {
+            Interlocked.Increment(ref staleGeneration.Value);
+            Interlocked.Exchange(ref lastStaleTicks.Value, Stopwatch.GetTimestamp());
+            return;
+        }
+
+        if (!measuring)
         {
             return;
         }
@@ -143,6 +156,10 @@ await RunTrialAsync(
     fanoutCopies,
     negativeLatency,
     generation,
+    staleGeneration,
+    lastStaleTicks,
+    drainQuietSeconds,
+    drainMaxWaitSeconds,
     histogram,
     v => measuring = v
 );
@@ -164,6 +181,10 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
             fanoutCopies,
             negativeLatency,
             generation,
+            staleGeneration,
+            lastStaleTicks,
+            drainQuietSeconds,
+            drainMaxWaitSeconds,
             histogram,
             v => measuring = v
         );
@@ -246,6 +267,10 @@ else
         fanoutCopies,
         negativeLatency,
         generation,
+        staleGeneration,
+        lastStaleTicks,
+        drainQuietSeconds,
+        drainMaxWaitSeconds,
         histogram,
         v => measuring = v
     );
@@ -306,6 +331,43 @@ static async Task WaitHealthy(HttpClient http, string baseUrl, int timeoutSecond
     throw new Exception($"Health check failed for {baseUrl} after {timeoutSeconds}s");
 }
 
+static async Task DrainAsync(Counter generation, Counter staleGeneration, Counter lastStaleTicks, double quietSeconds, double maxWaitSeconds)
+{
+    var staleAtStart = Interlocked.Read(ref staleGeneration.Value);
+
+    Interlocked.Increment(ref generation.Value);
+    Interlocked.Exchange(ref lastStaleTicks.Value, Stopwatch.GetTimestamp());
+
+    var tickFrequency = (double)Stopwatch.Frequency;
+    var start = Stopwatch.GetTimestamp();
+
+    while (true)
+    {
+        var now = Stopwatch.GetTimestamp();
+        var sinceLastStale = (now - Interlocked.Read(ref lastStaleTicks.Value)) / tickFrequency;
+
+        if (sinceLastStale >= quietSeconds)
+        {
+            break;
+        }
+
+        if ((now - start) / tickFrequency >= maxWaitSeconds)
+        {
+            Console.WriteLine($"  Warning: drain wait hit the {maxWaitSeconds:F0}s cap with stragglers still trickling in - proceeding anyway");
+            break;
+        }
+
+        await Task.Delay(250);
+    }
+
+    var strayCount = Interlocked.Read(ref staleGeneration.Value) - staleAtStart;
+    if (strayCount > 0)
+    {
+        var waitedSeconds = (Stopwatch.GetTimestamp() - start) / tickFrequency;
+        Console.WriteLine($"  Drained {strayCount} stale-generation stragglers over {waitedSeconds:F1}s before starting the next window");
+    }
+}
+
 static (long p50, long p95, long p99, long max) GetPercentiles(LongHistogram hist)
 {
     var p50 = hist.GetValueAtPercentile(50);
@@ -329,6 +391,10 @@ static async Task<TrialResult> RunTrialAsync(
     Counter fanoutCopies,
     Counter negativeLatency,
     Counter generation,
+    Counter staleGeneration,
+    Counter lastStaleTicks,
+    double drainQuietSeconds,
+    double drainMaxWaitSeconds,
     Recorder hist,
     Action<bool> setMeasuring
 )
@@ -398,6 +464,8 @@ static async Task<TrialResult> RunTrialAsync(
         totalElapsedSec += sw.Elapsed.TotalSeconds;
 
         pooledHist.Add(hist.GetIntervalHistogram());
+
+        await DrainAsync(generation, staleGeneration, lastStaleTicks, drainQuietSeconds, drainMaxWaitSeconds);
     }
 
     var missing = Math.Max(0, totalSent - totalUnique);
