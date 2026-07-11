@@ -82,17 +82,24 @@ using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 
 await Task.WhenAll(serverUrls.Select(url => WaitHealthy(http, url, healthCheckTimeoutSeconds)));
 
-if (backplane is "postgres" && payloadStrategy is "table")
+if ((backplane, payloadStrategy) is ("postgres", "table"))
 {
-    var postgresConnectionString = ConnectionStringHelper.NormalizePostgres(Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception("ConnectionStrings__Postgres is required when BACKPLANE=postgres"));
+    var postgresConnectionString = ConnectionStringHelper.NormalizePostgres(Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? "");
 
-    Console.WriteLine("Clearing backplane_payloads table before starting...");
+    if (string.IsNullOrWhiteSpace(postgresConnectionString))
+    {
+        Console.WriteLine("Unable to clear backplane_payloads table before running benchmark with table payload strategy; driver was not given a connection string.");
+    }
+    else
+    {
+        Console.WriteLine("Clearing backplane_payloads table before running benchmark with table payload strategy...");
 
-    await using var connection = new NpgsqlConnection(postgresConnectionString);
-    await connection.OpenAsync();
-    
-    await using var command = new NpgsqlCommand("TRUNCATE TABLE \"backplane_payloads\";", connection);
-    await command.ExecuteNonQueryAsync();
+        await using var connection = new NpgsqlConnection(postgresConnectionString);
+        await connection.OpenAsync();
+        
+        await using var command = new NpgsqlCommand("TRUNCATE TABLE \"backplane_payloads\";", connection);
+        await command.ExecuteNonQueryAsync();
+    }
 }
 
 var connections = new List<HubConnection>(clients);
