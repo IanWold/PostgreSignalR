@@ -79,6 +79,7 @@ var connections = new List<HubConnection>(clients);
 var seen = new ConcurrentDictionary<string, byte>(Environment.ProcessorCount, publishCount);
 var fanoutCopies = new Counter();
 var negativeLatency = new Counter();
+var generation = new Counter();
 
 var histogram = HistogramFactory.With64BitBucketSize()
     .WithValuesUpTo(60000000)
@@ -96,7 +97,7 @@ for (int i = 0; i < clients; i++)
 
     connection.On<Message>("bench", message =>
     {
-        if (!measuring)
+        if (!measuring || message.Generation != Interlocked.Read(ref generation.Value))
         {
             return;
         }
@@ -141,6 +142,7 @@ await RunTrialAsync(
     seen,
     fanoutCopies,
     negativeLatency,
+    generation,
     histogram,
     v => measuring = v
 );
@@ -161,6 +163,7 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
             seen,
             fanoutCopies,
             negativeLatency,
+            generation,
             histogram,
             v => measuring = v
         );
@@ -242,6 +245,7 @@ else
         seen,
         fanoutCopies,
         negativeLatency,
+        generation,
         histogram,
         v => measuring = v
     );
@@ -269,13 +273,14 @@ Console.WriteLine("Disconnecting clients...");
 await Task.WhenAll(connections.Select(c => c.DisposeAsync().AsTask()));
 Console.WriteLine("Done.");
 
-static async Task Publish(HttpClient http, string publisherUrl, int publishCount, int concurrency, int payloadBytes)
+static async Task Publish(HttpClient http, string publisherUrl, int publishCount, int concurrency, int payloadBytes, long generation)
 {
     var response = await http.PostAsJsonAsync($"{publisherUrl.TrimEnd('/')}/publish", new
     {
         PublishCount = publishCount,
         Concurrency = concurrency,
-        PayloadBytes = payloadBytes
+        PayloadBytes = payloadBytes,
+        Generation = generation
     });
 
     response.EnsureSuccessStatusCode();
@@ -323,6 +328,7 @@ static async Task<TrialResult> RunTrialAsync(
     ConcurrentDictionary<string, byte> seen,
     Counter fanoutCopies,
     Counter negativeLatency,
+    Counter generation,
     Recorder hist,
     Action<bool> setMeasuring
 )
@@ -341,6 +347,8 @@ static async Task<TrialResult> RunTrialAsync(
         Interlocked.Exchange(ref fanoutCopies.Value, 0);
         Interlocked.Exchange(ref negativeLatency.Value, 0);
 
+        var thisGeneration = Interlocked.Increment(ref generation.Value);
+
         setMeasuring(true);
 
         var totalToSend = Math.Max(1, targetRateMsgsPerSec * trialSeconds);
@@ -356,7 +364,7 @@ static async Task<TrialResult> RunTrialAsync(
         {
             var thisBatch = Math.Min(batchSize, totalToSend - sent);
 
-            inFlight.Add(Publish(http, publisherUrl, thisBatch, concurrency, payloadBytes));
+            inFlight.Add(Publish(http, publisherUrl, thisBatch, concurrency, payloadBytes, thisGeneration));
 
             next += (long)(batchPeriod.TotalSeconds * tickFreq);
             var now = Stopwatch.GetTimestamp();

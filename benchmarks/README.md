@@ -41,6 +41,8 @@ The `sweep` output table's `Rate (msg/s)` column is the offered rate, i.e. what 
 
 `ConnectionStrings__Postgres` and `ConnectionStrings__Redis` accept either the native keyword=value formats Npgsql/StackExchange.Redis expect, or a `postgres://`/`postgresql://` and `redis://`/`rediss://` URI - the format most cloud providers  hand out as `DATABASE_URL`/`REDIS_URL`. URIs are converted automatically (`rediss://` and a Postgres URI's `sslmode` query param both map through correctly); values already in native format are passed through unchanged, so the local docker-compose setup is unaffected. This lets `server`, `shared-load`, and the driver's backplane connections point at a real managed database instead of the containers the compose file provisions.
 
+Any other query param on a `postgres://` URI is passed straight through as an Npgsql connection string keyword (e.g. `?MaxPoolSize=10&MinPoolSize=10`), so pool tuning can be done entirely via the Railway variable value without code changes - e.g. appending `?MaxPoolSize=10&MinPoolSize=10` to the `server1`/`server2` services' `ConnectionStrings__Postgres` value (`${{Postgres.DATABASE_URL}}?MaxPoolSize=10&MinPoolSize=10`) keeps a small, pre-warmed pool of persistent connections instead of growing on demand up to Npgsql's default of 100.
+
 ## Dedicated vs. Shared Backplane
 
 By default the benchmarks give Postgres/Redis to the backplane exclusively - nothing else is talking to them. That's a best case, and not how these are typically deployed in production: Redis is frequently shared with other caching/session traffic, and the whole point of a Postgres backplane is usually to reuse a database you already run for your application, not stand up a dedicated instance.
@@ -74,3 +76,17 @@ I generated `run-comparisons.sh` to run a set of 10 predefined scenarios that I 
 If you're just interested in running certain scenarios, you can execute `run-comparisons.sh --list` to see all of them and list scenarios out to run, like `run-comparisons.sh redis-dedicated postgres-shared`.
 
 Logs are saved to `results/<timestamp>/<scenario>.log`
+
+## Running on Railway
+
+Local docker-compose puts everything on one Docker host, which doesn't approximate a real deployment (no real network hops, all services sharing the same CPU/memory). `run-comparisons-railway.sh` runs the same scenario matrix against a real Railway project instead, with `SERVER_URLS` and the URI-style connection string support (see "Connection strings" above) doing the work of pointing the same driver/server/shared-load images at cloud infrastructure instead of docker-compose's containers.
+
+This needs a one-time setup - see [RAILWAY_SETUP.md](RAILWAY_SETUP.md), which also documents the parts of the script that are best-effort and not yet confirmed against a live Railway account. Once set up:
+
+```
+./benchmarks/run-comparisons-railway.sh --list                 # same matrix as run-comparisons.sh
+./benchmarks/run-comparisons-railway.sh redis-dedicated         # dry-run: prints the commands only
+./benchmarks/run-comparisons-railway.sh --apply redis-dedicated # runs it for real
+```
+
+It defaults to dry-run (printing the `railway` commands rather than running them) since it hasn't been tested against a live account - pass `--apply` once you've sanity-checked the commands.

@@ -63,7 +63,8 @@ app.MapPost("/publish", async (PublishRequest request, IHubContext<BenchmarkHub>
             MessageId: Guid.NewGuid().ToString("N"),
             SentUnixTimeMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             PayloadBytes: request.PayloadBytes,
-            Payload: payload
+            Payload: payload,
+            Generation: request.Generation
         );
 
         sendTasks.Add(hub.Clients.All.SendAsync("bench", message, c).ContinueWith(

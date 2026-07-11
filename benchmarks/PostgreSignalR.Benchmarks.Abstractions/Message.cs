@@ -4,5 +4,6 @@ public record Message(
     string MessageId,
     long SentUnixTimeMs,
     int PayloadBytes,
-    string Payload
+    string Payload,
+    long Generation
 );
