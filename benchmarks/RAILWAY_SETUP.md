@@ -71,7 +71,11 @@ Same repo/root directory, with:
     }
   }
   ```
-- All of `SERVER_URLS`, `MODE`, `CLIENTS_PER_SERVER`, etc. are set per-scenario by the run script - you don't need to set anything here up front.
+- **Variables**:
+  ```
+  ConnectionStrings__Postgres=${{Postgres.DATABASE_URL}}
+  ```
+  The driver connects directly to Postgres to `TRUNCATE` the `backplane_payloads` table before each `postgres-*-table` scenario starts (the library's own TTL cleanup is disabled for these benchmarks, and unlike local docker-compose this Postgres instance is never torn down between scenarios - see README's payload-table note). All of `SERVER_URLS`, `MODE`, `CLIENTS_PER_SERVER`, `BACKPLANE`, `PAYLOAD_STRATEGY`, etc. are set per-scenario by the run script - you don't need to set anything else here up front.
 
 ## 6. Run it
 

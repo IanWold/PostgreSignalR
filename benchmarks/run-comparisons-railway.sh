@@ -42,42 +42,51 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 : "${MAX_SERVERS:=10}"
 
 : "${MODE:=sweep}"
-: "${CLIENTS_PER_SERVER:=500}"
 : "${PUBLISH_COUNT:=20000}"
 : "${CONCURRENCY:=128}"
 : "${PAYLOAD_BYTES:=128}"
 : "${WARMUP_SECONDS:=10}"
 : "${TARGET_RATE:=100}"
 : "${SLO_P99_MS:=250}"
-: "${SWEEP_START_RATE:=100}"
-: "${SWEEP_STEP_RATE:=100}"
-: "${SWEEP_MAX_RATE:=2000}"
 : "${SWEEP_TRIAL_SECONDS:=15}"
 : "${BATCH_SIZE:=25}"
 : "${REPEATS_PER_RATE:=3}"
 # Cloud builds/rollouts are slower than local docker-compose; give the driver's
 # own internal health-check loop more room before it gives up on a server.
 : "${HEALTH_CHECK_TIMEOUT_SECONDS:=180}"
+: "${DRAIN_QUIET_SECONDS:=1}"
+: "${DRAIN_MAX_WAIT_SECONDS:=60}"
 
-# name                          backplane  shared  num_servers  payload_strategy
+# name                            backplane  shared  num_servers  payload_strategy  clients_per_server  sweep_start  sweep_step  sweep_max
 scenarios=(
-  "redis-dedicated               redis    false 2  event"
-  "postgres-dedicated            postgres false 2  event"
-  "redis-shared                  redis    true  2  event"
-  "postgres-shared               postgres true  2  event"
-  "postgres-dedicated-table      postgres false 2  table"
-  "postgres-shared-table         postgres true  2  table"
-  "redis-dedicated-5servers      redis    false 5  event"
-  "postgres-dedicated-5servers   postgres false 5  event"
-  "redis-dedicated-10servers     redis    false 10 event"
-  "postgres-dedicated-10servers  postgres false 10 event"
+  "redis-dedicated                  redis    false 2  event  50   100 100 2000"
+  "postgres-dedicated               postgres false 2  event  50   100 100 2000"
+  "postgres-dedicated-table         postgres false 2  table  50   100 100 2000"
+  "redis-shared                     redis    true  2  event  50   100 100 2000"
+  "postgres-shared                  postgres true  2  event  50   100 100 2000"
+  "postgres-shared-table            postgres true  2  table  50   100 100 2000"
+  "redis-clients-500                redis    false 2  event  500  10  10  100"
+  "redis-clients-2000               redis    false 2  event  2000 10  10  100"
+  "redis-clients-4000               redis    false 2  event  4000 10  10  100"
+  "postgres-clients-500             postgres false 2  event  500  10  10  100"
+  "postgres-clients-2000            postgres false 2  event  2000 10  10  100"
+  "postgres-clients-4000            postgres false 2  event  4000 10  10  100"
+  "postgres-clients-500-table       postgres false 2  table  500  10  10  100"
+  "postgres-clients-2000-table      postgres false 2  table  2000 10  10  100"
+  "postgres-clients-4000-table      postgres false 2  table  4000 10  10  100"
+  "redis-dedicated-5servers         redis    false 5  event  50   100 100 2000"
+  "postgres-dedicated-5servers      postgres false 5  event  50   100 100 2000"
+  "redis-dedicated-10servers        redis    false 10 event  50   100 100 2000"
+  "postgres-dedicated-10servers     postgres false 10 event  50   100 100 2000"
 )
 
 print_matrix() {
-  printf '%-30s %-9s %-7s %-11s %s\n' "NAME" "BACKPLANE" "SHARED" "NUM_SERVERS" "PAYLOAD_STRATEGY"
+  printf '%-30s %-9s %-7s %-11s %-9s %-19s %-12s %-11s %s\n' \
+    "NAME" "BACKPLANE" "SHARED" "NUM_SERVERS" "STRATEGY" "CLIENTS_PER_SERVER" "SWEEP_START" "SWEEP_STEP" "SWEEP_MAX"
   for entry in "${scenarios[@]}"; do
-    read -r name backplane shared num_servers strategy <<< "$entry"
-    printf '%-30s %-9s %-7s %-11s %s\n' "$name" "$backplane" "$shared" "$num_servers" "$strategy"
+    read -r name backplane shared num_servers strategy clients_per_server sweep_start sweep_step sweep_max <<< "$entry"
+    printf '%-30s %-9s %-7s %-11s %-9s %-19s %-12s %-11s %s\n' \
+      "$name" "$backplane" "$shared" "$num_servers" "$strategy" "$clients_per_server" "$sweep_start" "$sweep_step" "$sweep_max"
   done
 }
 
@@ -187,7 +196,7 @@ configure_scenario() {
 # and polls its logs until a new "Done." line (the driver's own final line)
 # appears.
 run_driver() {
-  local num_servers=$1 log_file=$2
+  local num_servers=$1 clients_per_server=$2 sweep_start=$3 sweep_step=$4 sweep_max=$5 log_file=$6 backplane=$7 strategy=$8
 
   local server_urls=""
   for i in $(seq 1 "$num_servers"); do
@@ -195,23 +204,30 @@ run_driver() {
   done
   server_urls="${server_urls%,}"
 
+  # BACKPLANE/PAYLOAD_STRATEGY tell the driver whether to truncate backplane_payloads before this
+  # scenario starts (see PostgreSignalR.Benchmarks/Program.cs) - needed here because, unlike local
+  # docker-compose, this Postgres instance is never torn down between scenarios.
   run railway variables --service driver \
     --set "SERVER_URLS=$server_urls" \
+    --set "BACKPLANE=$backplane" \
+    --set "PAYLOAD_STRATEGY=$strategy" \
     --set "MODE=$MODE" \
-    --set "CLIENTS_PER_SERVER=$CLIENTS_PER_SERVER" \
+    --set "CLIENTS_PER_SERVER=$clients_per_server" \
     --set "PUBLISH_COUNT=$PUBLISH_COUNT" \
     --set "CONCURRENCY=$CONCURRENCY" \
     --set "PAYLOAD_BYTES=$PAYLOAD_BYTES" \
     --set "WARMUP_SECONDS=$WARMUP_SECONDS" \
     --set "TARGET_RATE=$TARGET_RATE" \
     --set "SLO_P99_MS=$SLO_P99_MS" \
-    --set "SWEEP_START_RATE=$SWEEP_START_RATE" \
-    --set "SWEEP_STEP_RATE=$SWEEP_STEP_RATE" \
-    --set "SWEEP_MAX_RATE=$SWEEP_MAX_RATE" \
+    --set "SWEEP_START_RATE=$sweep_start" \
+    --set "SWEEP_STEP_RATE=$sweep_step" \
+    --set "SWEEP_MAX_RATE=$sweep_max" \
     --set "SWEEP_TRIAL_SECONDS=$SWEEP_TRIAL_SECONDS" \
     --set "BATCH_SIZE=$BATCH_SIZE" \
     --set "REPEATS_PER_RATE=$REPEATS_PER_RATE" \
-    --set "HEALTH_CHECK_TIMEOUT_SECONDS=$HEALTH_CHECK_TIMEOUT_SECONDS"
+    --set "HEALTH_CHECK_TIMEOUT_SECONDS=$HEALTH_CHECK_TIMEOUT_SECONDS" \
+    --set "DRAIN_QUIET_SECONDS=$DRAIN_QUIET_SECONDS" \
+    --set "DRAIN_MAX_WAIT_SECONDS=$DRAIN_MAX_WAIT_SECONDS"
 
   try_redeploy driver
 
@@ -222,11 +238,15 @@ run_driver() {
     # deployment - unconfirmed - so rather than trust the first "Done." we see (which could
     # be left over from a previous scenario if fetches aren't scoped that way), we record how
     # many completions are present before waiting, and wait for that count to increase.
+    # The match is intentionally NOT anchored to a whole line (^Done\.$) - fetched output has
+    # been observed out of logical print order and occasionally with lines run together, and
+    # "Done." only ever appears in the driver's own final line, so a plain substring match is
+    # both safe and more robust against that than requiring it to stand alone on its own line.
     echo "+ railway logs --service driver (establishing baseline)"
     railway logs --service driver > "$log_file" 2>/dev/null || true
 
     local baseline
-    baseline=$(grep -c "^Done\.$" "$log_file" 2>/dev/null || true)
+    baseline=$(grep -c "Done\." "$log_file" 2>/dev/null || true)
     baseline=${baseline:-0}
 
     local waited=0
@@ -240,7 +260,7 @@ run_driver() {
       railway logs --service driver > "$log_file" 2>/dev/null || true
 
       local current
-      current=$(grep -c "^Done\.$" "$log_file" 2>/dev/null || true)
+      current=$(grep -c "Done\." "$log_file" 2>/dev/null || true)
       current=${current:-0}
 
       if (( current > baseline )); then
@@ -263,19 +283,20 @@ run_driver() {
 summary=()
 
 for entry in "${selected[@]}"; do
-  read -r name backplane shared num_servers strategy <<< "$entry"
+  read -r name backplane shared num_servers strategy clients_per_server sweep_start sweep_step sweep_max <<< "$entry"
   log_file="$results_dir/$name.log"
 
   echo "=============================================="
   echo "Scenario: $name"
   echo "  BACKPLANE=$backplane SIMULATE_SHARED_LOAD=$shared NUM_SERVERS=$num_servers PAYLOAD_STRATEGY=$strategy"
+  echo "  CLIENTS_PER_SERVER=$clients_per_server SWEEP=$sweep_start-$sweep_max step $sweep_step"
   echo "  Log: $log_file"
   echo "=============================================="
 
   configure_scenario "$backplane" "$shared" "$strategy"
 
   status=0
-  run_driver "$num_servers" "$log_file" || status=$?
+  run_driver "$num_servers" "$clients_per_server" "$sweep_start" "$sweep_step" "$sweep_max" "$log_file" "$backplane" "$strategy" || status=$?
 
   summary+=("$name:$status")
 

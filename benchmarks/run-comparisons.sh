@@ -7,49 +7,69 @@ set -euo pipefail
 # never inherits leftover Postgres/Redis state (payload tables, shared-load rows,
 # stale NOTIFY listeners) from the previous run.
 #
-# WARNING: this is slow. At the defaults below, one sweep is ~40 rate steps x
-# REPEATS_PER_RATE trials x SWEEP_TRIAL_SECONDS - roughly 30 minutes per scenario,
-# so the full matrix is several hours. Pass scenario names to run a subset, or
-# override REPEATS_PER_RATE / SWEEP_MAX_RATE / SWEEP_STEP_RATE / SWEEP_TRIAL_SECONDS
-# in your environment for a quicker smoke test.
+# WARNING: this is slow - each scenario's rate sweep and CLIENTS_PER_SERVER are tuned per
+# scenario now (see --list), and a full sweep is commonly 20-30 minutes, so the full matrix
+# (16 scenarios) is several hours. Pass scenario names to run a subset, or override
+# REPEATS_PER_RATE / SWEEP_TRIAL_SECONDS in your environment for a quicker smoke test
+# (CLIENTS_PER_SERVER and the sweep rate bounds themselves are per-scenario, not overridable
+# this way - edit the scenarios array directly if you need different values there).
 #
 # Usage:
 #   ./benchmarks/run-comparisons.sh                                # run every scenario
 #   ./benchmarks/run-comparisons.sh --list                          # print the matrix and exit
 #   ./benchmarks/run-comparisons.sh redis-dedicated postgres-shared # run only the named scenarios
-#   REPEATS_PER_RATE=1 SWEEP_MAX_RATE=300 ./benchmarks/run-comparisons.sh redis-dedicated
+#   REPEATS_PER_RATE=1 SWEEP_TRIAL_SECONDS=5 ./benchmarks/run-comparisons.sh redis-dedicated
 #                                                                    # quick smoke test of one scenario
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 : "${MODE:=sweep}"
-: "${CLIENTS_PER_SERVER:=500}"
 : "${PUBLISH_COUNT:=20000}"
 : "${CONCURRENCY:=128}"
 : "${PAYLOAD_BYTES:=128}"
 : "${REPEATS_PER_RATE:=3}"
 
-export MODE CLIENTS_PER_SERVER PUBLISH_COUNT CONCURRENCY PAYLOAD_BYTES REPEATS_PER_RATE
+export MODE PUBLISH_COUNT CONCURRENCY PAYLOAD_BYTES REPEATS_PER_RATE
 
-# name                          backplane  shared  num_servers  payload_strategy
+# Four groups, each answering a different question - see run-comparisons-railway.sh for the
+# full rationale (this mirrors the same matrix):
+#   1. redis/postgres-dedicated/shared: core backplane comparison + max sustainable rate.
+#   2. postgres-*-table: same, with the payload-table strategy instead of the default event one.
+#   3. *-clients-N: fixed low rate, CLIENTS_PER_SERVER pushed up in steps - max sustainable
+#      client count. Client count isn't swept within one run like rate is, so each checkpoint
+#      is its own scenario.
+#   4. *-dedicated-Nservers: fixed client count/rate, more subscriber nodes - fan-out width.
+#
+# name                            backplane  shared  num_servers  payload_strategy  clients_per_server  sweep_start  sweep_step  sweep_max
 scenarios=(
-  "redis-dedicated               redis    false 2  event"
-  "postgres-dedicated            postgres false 2  event"
-  "redis-shared                  redis    true  2  event"
-  "postgres-shared               postgres true  2  event"
-  "postgres-dedicated-table      postgres false 2  table"
-  "postgres-shared-table         postgres true  2  table"
-  "redis-dedicated-5servers      redis    false 5  event"
-  "postgres-dedicated-5servers   postgres false 5  event"
-  "redis-dedicated-10servers     redis    false 10 event"
-  "postgres-dedicated-10servers  postgres false 10 event"
+  "redis-dedicated                  redis    false 2  event  50   100 100 2000"
+  "postgres-dedicated               postgres false 2  event  50   100 100 2000"
+  "postgres-dedicated-table         postgres false 2  table  50   100 100 2000"
+  "redis-shared                     redis    true  2  event  50   100 100 2000"
+  "postgres-shared                  postgres true  2  event  50   100 100 2000"
+  "postgres-shared-table            postgres true  2  table  50   100 100 2000"
+  "redis-clients-500                redis    false 2  event  500  10  10  100"
+  "redis-clients-2000               redis    false 2  event  2000 10  10  100"
+  "redis-clients-4000               redis    false 2  event  4000 10  10  100"
+  "postgres-clients-500             postgres false 2  event  500  10  10  100"
+  "postgres-clients-2000            postgres false 2  event  2000 10  10  100"
+  "postgres-clients-4000            postgres false 2  event  4000 10  10  100"
+  "postgres-clients-500-table       postgres false 2  table  500  10  10  100"
+  "postgres-clients-2000-table      postgres false 2  table  2000 10  10  100"
+  "postgres-clients-4000-table      postgres false 2  table  4000 10  10  100"
+  "redis-dedicated-5servers         redis    false 5  event  50   100 100 2000"
+  "postgres-dedicated-5servers      postgres false 5  event  50   100 100 2000"
+  "redis-dedicated-10servers        redis    false 10 event  50   100 100 2000"
+  "postgres-dedicated-10servers     postgres false 10 event  50   100 100 2000"
 )
 
 print_matrix() {
-  printf '%-30s %-9s %-7s %-11s %s\n' "NAME" "BACKPLANE" "SHARED" "NUM_SERVERS" "PAYLOAD_STRATEGY"
+  printf '%-30s %-9s %-7s %-11s %-9s %-19s %-12s %-11s %s\n' \
+    "NAME" "BACKPLANE" "SHARED" "NUM_SERVERS" "STRATEGY" "CLIENTS_PER_SERVER" "SWEEP_START" "SWEEP_STEP" "SWEEP_MAX"
   for entry in "${scenarios[@]}"; do
-    read -r name backplane shared num_servers strategy <<< "$entry"
-    printf '%-30s %-9s %-7s %-11s %s\n' "$name" "$backplane" "$shared" "$num_servers" "$strategy"
+    read -r name backplane shared num_servers strategy clients_per_server sweep_start sweep_step sweep_max <<< "$entry"
+    printf '%-30s %-9s %-7s %-11s %-9s %-19s %-12s %-11s %s\n' \
+      "$name" "$backplane" "$shared" "$num_servers" "$strategy" "$clients_per_server" "$sweep_start" "$sweep_step" "$sweep_max"
   done
 }
 
@@ -96,7 +116,7 @@ timestamp=$(date +%Y%m%d-%H%M%S)
 results_dir="benchmarks/results/$timestamp"
 mkdir -p "$results_dir"
 
-echo "Baseline: MODE=$MODE CLIENTS_PER_SERVER=$CLIENTS_PER_SERVER PUBLISH_COUNT=$PUBLISH_COUNT CONCURRENCY=$CONCURRENCY PAYLOAD_BYTES=$PAYLOAD_BYTES REPEATS_PER_RATE=$REPEATS_PER_RATE"
+echo "Baseline: MODE=$MODE PUBLISH_COUNT=$PUBLISH_COUNT CONCURRENCY=$CONCURRENCY PAYLOAD_BYTES=$PAYLOAD_BYTES REPEATS_PER_RATE=$REPEATS_PER_RATE (CLIENTS_PER_SERVER and sweep bounds are per-scenario now, see --list)"
 echo "Results directory: $results_dir"
 echo "Scenarios: $(for e in "${selected[@]}"; do printf '%s ' "${e%% *}"; done)"
 echo
@@ -110,12 +130,13 @@ cleanup() {
 trap cleanup EXIT
 
 for entry in "${selected[@]}"; do
-  read -r name backplane shared num_servers strategy <<< "$entry"
+  read -r name backplane shared num_servers strategy clients_per_server sweep_start sweep_step sweep_max <<< "$entry"
   log_file="$results_dir/$name.log"
 
   echo "=============================================="
   echo "Scenario: $name"
   echo "  BACKPLANE=$backplane SIMULATE_SHARED_LOAD=$shared NUM_SERVERS=$num_servers PAYLOAD_STRATEGY=$strategy"
+  echo "  CLIENTS_PER_SERVER=$clients_per_server SWEEP=$sweep_start-$sweep_max step $sweep_step"
   echo "  Log: $log_file"
   echo "=============================================="
 
@@ -126,6 +147,10 @@ for entry in "${selected[@]}"; do
   SIMULATE_SHARED_LOAD="$shared" \
   NUM_SERVERS="$num_servers" \
   PAYLOAD_STRATEGY="$strategy" \
+  CLIENTS_PER_SERVER="$clients_per_server" \
+  SWEEP_START_RATE="$sweep_start" \
+  SWEEP_STEP_RATE="$sweep_step" \
+  SWEEP_MAX_RATE="$sweep_max" \
   docker compose up --build --abort-on-container-exit --exit-code-from driver 2>&1 | tee "$log_file" || status=$?
 
   summary+=("$name:$status")

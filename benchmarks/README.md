@@ -31,9 +31,11 @@ The other variables you can specify:
 * `MEASURE_SECONDS`: For `single` runs, the number of seconds to measure. Messages/second will be `PUBLISH_COUNT / MEASURE_SECONDS`.
 * `REPEATS_PER_RATE`: The number of independent trials to run at each rate (each rate in a `sweep`, or the single trial in `single` mode). Latency percentiles are computed over the pooled samples from all repeats; `Sent`/`Missing`/`Fanout Copies` are summed. Default 1.
 * `HEALTH_CHECK_TIMEOUT_SECONDS`: How long the driver waits (polling once per second) for each server's `/health` endpoint before giving up and failing the run. Default 60.
+* `DRAIN_QUIET_SECONDS`: After each repeat (including warmup's), every message carries the generation number of the window it was sent for - a straggler that arrives late always keeps its original generation, so it's rejected by comparing against the currently active one rather than trusting arrival timing. Before starting the next window, the driver waits until no such stragglers have arrived for this many seconds, rather than assuming a fixed delay is enough (which doesn't scale to slower/more congested runs, e.g. many clients or degraded infrastructure). Default 2.
+* `DRAIN_MAX_WAIT_SECONDS`: A cap on the above, in case stragglers never fully stop arriving - the run proceeds anyway with a warning rather than hanging forever. Default 60.
 * `PAYLOAD_STRATEGY`: Only applies when `BACKPLANE=postgres`
     * `event` (default) sends payloads inline in the notification event.
-    * `table` uses PostgreSignalR's payload table strategy instead (`AddBackplaneTablePayloadStrategy` with `StorageMode=Always`).
+    * `table` uses PostgreSignalR's payload table strategy instead (`AddBackplaneTablePayloadStrategy` with `StorageMode=Always`). The server disables the library's own TTL-based row cleanup for this benchmark, so before each run the driver connects to `ConnectionStrings__Postgres` directly and truncates the `backplane_payloads` table itself - this matters most on Railway, where the same Postgres instance is reused across every scenario instead of being torn down like local docker-compose's is.
 
 The `sweep` output table's `Rate (msg/s)` column is the offered rate, i.e. what the driver was asked to send - it is not necessarily what was achieved. The `Achieved (msg/s)` column is the rate actually measured (messages sent / actual dispatch time), which falls below the target once the driver or server can't keep up. When achieved rate drops more than 5% below target, a warning is printed, since the latency figures on that row reflect the achieved rate, not the labeled one. The same applies to `single` mode's `Sent ... achieved` line.
 
@@ -71,7 +73,14 @@ BACKPLANE=postgres SIMULATE_SHARED_LOAD=true MODE=sweep docker compose up --buil
 
 ## Recreating all my Benchmarks
 
-I generated `run-comparisons.sh` to run a set of 10 predefined scenarios that I think give a good comparison across several different use cases. Each scenario takes 30 minuets to run, so the whole suite takes a little over 5 hours.
+I generated `run-comparisons.sh` to run a set of 16 predefined scenarios that I think give a good comparison across several different use cases, grouped into four questions:
+
+1. `redis`/`postgres`-`dedicated`/`shared`: the core backplane comparison, with a rate sweep up to 2000 msg/s - this doubles as "what's the max sustainable publish rate" discovery.
+2. `postgres-*-table`: same, but the payload-table strategy instead of the default event one.
+3. `*-clients-N`: fixed low rate (10-100 msg/s, a realistic occasional-broadcast pattern rather than a firehose), with the client count per server pushed up in steps (500/2000/4000) - "what's the max sustainable client count" discovery.
+4. `*-dedicated-Nservers`: fixed client count/rate, but spreading load across more subscriber nodes - fan-out width, a different axis from the above.
+
+Each scenario's rate sweep, client count, and other parameters are baked in per-scenario (see `run-comparisons.sh --list` for the exact values) rather than configurable via environment variables, since the whole point is a fixed, repeatable matrix - edit the `scenarios` array directly if you want different values. Scenarios in groups 1-2 and 4 take roughly 20-30 minutes each; group 3's scenarios are quicker given their smaller rate sweep. The full suite takes several hours.
 
 If you're just interested in running certain scenarios, you can execute `run-comparisons.sh --list` to see all of them and list scenarios out to run, like `run-comparisons.sh redis-dedicated postgres-shared`.
 
