@@ -120,8 +120,21 @@ Console.WriteLine($"Measurement mode: {mode}");
 Console.WriteLine();
 
 Console.WriteLine($"Warmup: {warmupSeconds}s");
-await Publish(http, publisherUrl, publishCount: Math.Min(2000, publishCount / 10), concurrency: Math.Max(8, concurrency / 4), payloadBytes);
-await Task.Delay(TimeSpan.FromSeconds(warmupSeconds));
+
+await RunTrialAsync(
+    http,
+    publisherUrl,
+    targetRate,
+    warmupSeconds,
+    1,
+    concurrency,
+    payloadBytes,
+    batchSize,
+    seen,
+    fanoutCopies,
+    histogram,
+    v => measuring = v
+);
 
 if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
 {
