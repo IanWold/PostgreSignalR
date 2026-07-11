@@ -7,7 +7,9 @@ sealed record TrialResult(
     int UniqueReceived,
     int Missing,
     long FanoutCopies,
-    long P50Us, long P95Us, long P99Us, long MaxUs
+    long P50Us, long P95Us, long P99Us, long MaxUs,
+    long HistogramCount,
+    long NegativeLatencyCount
 )
 {
     public double AchievedRateMsgsPerSec =>

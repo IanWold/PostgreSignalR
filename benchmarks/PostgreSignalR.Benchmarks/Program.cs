@@ -78,6 +78,7 @@ var connections = new List<HubConnection>(clients);
 
 var seen = new ConcurrentDictionary<string, byte>(Environment.ProcessorCount, publishCount);
 var fanoutCopies = new Counter();
+var negativeLatency = new Counter();
 
 var histogram = HistogramFactory.With64BitBucketSize()
     .WithValuesUpTo(60000000)
@@ -106,7 +107,14 @@ for (int i = 0; i < clients; i++)
             return;
         }
 
-        histogram.RecordValue(Math.Min(Math.Max((DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.SentUnixTimeMs) * 1000, 0), 60000000));
+        var rawLatencyUs = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.SentUnixTimeMs) * 1000;
+
+        if (rawLatencyUs < 0)
+        {
+            Interlocked.Increment(ref negativeLatency.Value);
+        }
+
+        histogram.RecordValue(Math.Min(Math.Max(rawLatencyUs, 0), 60000000));
     });
 
     connections.Add(connection);
@@ -132,6 +140,7 @@ await RunTrialAsync(
     batchSize,
     seen,
     fanoutCopies,
+    negativeLatency,
     histogram,
     v => measuring = v
 );
@@ -151,20 +160,23 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
             batchSize,
             seen,
             fanoutCopies,
+            negativeLatency,
             histogram,
             v => measuring = v
         );
 
         Console.WriteLine(
             $"| {$"{result.TargetRateMsgsPerSec,12}"} |" +
-            $" {$"{result.AchievedRateMsgsPerSec,14:F0}"} |" +
+            $" {$"{result.AchievedRateMsgsPerSec,16:F0}"} |" +
             $" {result.P50Us,8} |" +
             $" {result.P95Us,8} |" +
             $" {result.P99Us,8} |" +
             $" {result.MaxUs,8} |" +
             $" {$"{result.Missing,7}"} |" +
             $" {$"{result.FanoutCopies,13}"} |" +
-            $" {$"{result.Sent,13}"} |"
+            $" {$"{result.Sent,13}"} |" +
+            $" {$"{result.HistogramCount,10}"} |" +
+            $" {$"{result.NegativeLatencyCount,11}"} |"
         );
 
         if (result.AchievedRateMsgsPerSec < rate * 0.95)
@@ -189,8 +201,8 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
 
     Console.WriteLine();
     Console.WriteLine("Sweep up:");
-    Console.WriteLine("| Rate (msg/s) | Achieved (msg/s) | p50 (Us) | p95 (Us) | p99 (Us) | Max (Us) | Missing | Fanout Copies | Messages Sent |");
-    Console.WriteLine("|--------------|------------------|----------|----------|----------|----------|---------|---------------|---------------|");
+    Console.WriteLine("| Rate (msg/s) | Achieved (msg/s) | p50 (Us) | p95 (Us) | p99 (Us) | Max (Us) | Missing | Fanout Copies | Messages Sent | Hist Count | Neg Latency |");
+    Console.WriteLine("|--------------|------------------|----------|----------|----------|----------|---------|---------------|---------------|------------|-------------|");
 
     for (int rate = sweepStartRate; rate <= sweepMaxRate; rate += sweepStepRate)
     {
@@ -202,8 +214,8 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
 
     Console.WriteLine();
     Console.WriteLine("Sweep down:");
-    Console.WriteLine("| Rate (msg/s) | Achieved (msg/s) | p50 (Us) | p95 (Us) | p99 (Us) | Max (Us) | Missing | Fanout Copies | Messages Sent |");
-    Console.WriteLine("|--------------|------------------|----------|----------|----------|----------|---------|---------------|---------------|");
+    Console.WriteLine("| Rate (msg/s) | Achieved (msg/s) | p50 (Us) | p95 (Us) | p99 (Us) | Max (Us) | Missing | Fanout Copies | Messages Sent | Hist Count | Neg Latency |");
+    Console.WriteLine("|--------------|------------------|----------|----------|----------|----------|---------|---------------|---------------|------------|-------------|");
 
     for (int rate = sweepMaxRate; rate >= sweepStartRate; rate -= sweepStepRate)
     {
@@ -229,6 +241,7 @@ else
         batchSize,
         seen,
         fanoutCopies,
+        negativeLatency,
         histogram,
         v => measuring = v
     );
@@ -247,6 +260,8 @@ else
     Console.WriteLine($"Missing: {result.Missing}");
     Console.WriteLine($"Fanout copies (expected): {result.FanoutCopies}");
     Console.WriteLine($"Latency p50: {result.P50Us}us, p95: {result.P95Us}us, p99: {result.P99Us}us, max: {result.MaxUs}us");
+    Console.WriteLine($"Histogram count: {result.HistogramCount} (compare to Unique received above - should match)");
+    Console.WriteLine($"Negative computed latency (clamped to 0): {result.NegativeLatencyCount}");
 }
 
 Console.WriteLine();
@@ -307,6 +322,7 @@ static async Task<TrialResult> RunTrialAsync(
     int batchSize,
     ConcurrentDictionary<string, byte> seen,
     Counter fanoutCopies,
+    Counter negativeLatency,
     Recorder hist,
     Action<bool> setMeasuring
 )
@@ -316,12 +332,14 @@ static async Task<TrialResult> RunTrialAsync(
     long totalSent = 0;
     long totalUnique = 0;
     long totalFanoutCopies = 0;
+    long totalNegativeLatency = 0;
     double totalElapsedSec = 0;
 
     for (int repeat = 0; repeat < repeats; repeat++)
     {
         seen.Clear();
         Interlocked.Exchange(ref fanoutCopies.Value, 0);
+        Interlocked.Exchange(ref negativeLatency.Value, 0);
 
         setMeasuring(true);
 
@@ -368,6 +386,7 @@ static async Task<TrialResult> RunTrialAsync(
         totalSent += totalToSend;
         totalUnique += seen.Count;
         totalFanoutCopies += Interlocked.Read(ref fanoutCopies.Value);
+        totalNegativeLatency += Interlocked.Read(ref negativeLatency.Value);
         totalElapsedSec += sw.Elapsed.TotalSeconds;
 
         pooledHist.Add(hist.GetIntervalHistogram());
@@ -384,6 +403,8 @@ static async Task<TrialResult> RunTrialAsync(
         (int)totalUnique,
         (int)missing,
         totalFanoutCopies,
-        p50, p95, p99, max
+        p50, p95, p99, max,
+        pooledHist.TotalCount,
+        totalNegativeLatency
     );
 }
