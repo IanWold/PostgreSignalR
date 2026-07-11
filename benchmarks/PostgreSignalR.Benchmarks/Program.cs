@@ -167,7 +167,7 @@ Console.WriteLine();
 
 Console.WriteLine($"Warmup: {warmupSeconds}s");
 
-await RunTrialAsync(
+var warmupResult = await RunTrialAsync(
     http,
     publisherUrl,
     targetRate,
@@ -187,6 +187,22 @@ await RunTrialAsync(
     histogram,
     v => measuring = v
 );
+
+async Task<int> FinishAsync(int exitCode)
+{
+    Console.WriteLine();
+    Console.WriteLine("Disconnecting clients...");
+    await Task.WhenAll(connections.Select(c => c.DisposeAsync().AsTask()));
+    Console.WriteLine("Done.");
+    return exitCode;
+}
+
+if (warmupResult.Sent > 0 && warmupResult.UniqueReceived == 0)
+{
+    Console.WriteLine();
+    Console.WriteLine($"Stopping; warmup sent {warmupResult.Sent} messages but received 0.");
+    return await FinishAsync(1);
+}
 
 if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
 {
@@ -230,6 +246,12 @@ if (mode.Equals("sweep", StringComparison.OrdinalIgnoreCase))
         if (result.AchievedRateMsgsPerSec < rate * 0.95)
         {
             Console.WriteLine($"  Warning: achieved {result.AchievedRateMsgsPerSec:F0} msg/s, below the {rate} msg/s target - driver/server could not keep pace, latency at this row reflects a lower effective rate");
+        }
+
+        if (result.Sent > 0 && result.HistogramCount == 0)
+        {
+            Console.WriteLine($"Stopped: received 0 of {result.Sent} messages sent this trial.");
+            return false;
         }
 
         if (result.P99Us > sloP99Ms * 1000L)
@@ -315,12 +337,14 @@ else
     Console.WriteLine($"Latency p50: {result.P50Us}us, p95: {result.P95Us}us, p99: {result.P99Us}us, max: {result.MaxUs}us");
     Console.WriteLine($"Histogram count: {result.HistogramCount} (compare to Unique received above - should match)");
     Console.WriteLine($"Negative computed latency (clamped to 0): {result.NegativeLatencyCount}");
+
+    if (result.Sent > 0 && result.HistogramCount == 0)
+    {
+        Console.WriteLine("Warning: received 0 messages (initialization error?).");
+    }
 }
 
-Console.WriteLine();
-Console.WriteLine("Disconnecting clients...");
-await Task.WhenAll(connections.Select(c => c.DisposeAsync().AsTask()));
-Console.WriteLine("Done.");
+return await FinishAsync(0);
 
 static async Task Publish(HttpClient http, string publisherUrl, int publishCount, int concurrency, int payloadBytes, long generation)
 {
@@ -394,6 +418,11 @@ static async Task DrainAsync(Counter generation, Counter staleGeneration, Counte
 
 static (long p50, long p95, long p99, long max) GetPercentiles(LongHistogram hist)
 {
+    if (hist.TotalCount == 0)
+    {
+        return (0, 0, 0, 0);
+    }
+
     var p50 = hist.GetValueAtPercentile(50);
     var p95 = hist.GetValueAtPercentile(95);
     var p99 = hist.GetValueAtPercentile(99);
