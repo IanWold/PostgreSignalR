@@ -1,11 +1,24 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Text;
 using PostgreSignalR.Benchmarks.Abstractions;
 using PostgreSignalR.Benchmarks;
 using HdrHistogram;
 using Microsoft.AspNetCore.SignalR.Client;
 using Npgsql;
+
+var consoleBuffer = new StringBuilder();
+Console.SetOut(new BufferedTextWriter(Console.Out, consoleBuffer));
+Console.SetError(new BufferedTextWriter(Console.Error, consoleBuffer));
+
+var resultsCollectorUrl = Environment.GetEnvironmentVariable("RESULTS_COLLECTOR_URL");
+
+AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+{
+    consoleBuffer.AppendLine((e.ExceptionObject as Exception)?.ToString() ?? e.ExceptionObject?.ToString());
+    PostResultsToCollectorAsync(resultsCollectorUrl, consoleBuffer.ToString()).GetAwaiter().GetResult();
+};
 
 static string Env(string key, string fallback) =>
     Environment.GetEnvironmentVariable(key) ?? fallback;
@@ -197,6 +210,7 @@ async Task<int> FinishAsync(int exitCode)
     Console.WriteLine("Disconnecting clients...");
     await Task.WhenAll(connections.Select(c => c.DisposeAsync().AsTask()));
     Console.WriteLine("Done.");
+    await PostResultsToCollectorAsync(resultsCollectorUrl, consoleBuffer.ToString());
     return exitCode;
 }
 
@@ -380,6 +394,24 @@ static async Task WaitHealthy(HttpClient http, string baseUrl, int timeoutSecond
     }
 
     throw new Exception($"Health check failed for {baseUrl} after {timeoutSeconds}s");
+}
+
+static async Task PostResultsToCollectorAsync(string? collectorUrl, string output)
+{
+    if (string.IsNullOrWhiteSpace(collectorUrl))
+    {
+        return;
+    }
+
+    try
+    {
+        using var client = new HttpClient();
+        await client.PostAsync(collectorUrl, new StringContent(output));
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"Failed to post results to collector: {ex}");
+    }
 }
 
 static async Task<(long OffsetMs, long BestRoundTripMs)> EstimateClockOffsetMsAsync(HttpClient http, string serverUrl)
