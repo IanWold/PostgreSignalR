@@ -1,12 +1,13 @@
 # Benchmarks
 
-The benchmarks use three projects:
+The benchmarks use four projects:
 
 * [PostgreSignalR.Benchmarks](https://github.com/IanWold/PostgreSignalR/tree/main/benchmarks/PostgreSignalR.Benchmarks) is the executable that performs the benchmarks.
 * [PostgreSignalR.Benchmarks.Server](https://github.com/IanWold/PostgreSignalR/tree/main/benchmarks/PostgreSignalR.Benchmarks.Server) is a server implementation the benchmarks use to test the backplanes.
+* [PostgreSignalR.Benchmarks.SharedLoad](https://github.com/IanWold/PostgreSignalR/tree/main/benchmarks/PostgreSignalR.Benchmarks.SharedLoad) optionally simulates other traffic on the backplane's Postgres/Redis instance, unrelated to SignalR.
 * [PostgreSignalR.Benchmarks.Abstractions](https://github.com/IanWold/PostgreSignalR/tree/main/benchmarks/PostgreSignalR.Benchmarks.Abstractions) is a shared class.
 
-The benchmarks are run through docker compose. The docker-compose yml will create containers for postgres and redis, two server containers, and one driver container which will run the benchmarks. The benchmarks can run either the Redis or Postgres backplanes.
+The benchmarks are run through docker compose. The docker-compose yml will create containers for postgres and redis, 10 fixed server slots (`server1`-`server10`), the shared-load generator, and one driver container which will run the benchmarks. The benchmarks can run either the Redis or Postgres backplanes.
 
 ```
 BACKPLANE=postgres MODE=sweep docker compose up --build --abort-on-container-exit --exit-code-from driver
@@ -18,11 +19,83 @@ There are two modes it can run in:
 * `single` runs a single round of tests
 * `sweep` will run many rounds of tests, incrementing the number of clients. It will sweep up and down.
 
-The other variables you acn specify:
+The other variables you can specify:
 
-* `CLIENTS`: the numbre of clients to connect.
+* `NUM_SERVERS`: the number of server nodes to spread the backplane fanout across, from 2 to 10 (docker-compose.yml defines 10 fixed slots, `server1`-`server10`; raise the ceiling there if you need more). `server1` is always the sole publish target; the rest are subscribers, each getting `CLIENTS_PER_SERVER` connections. This lets you test whether fanout latency degrades as the number of subscribing nodes grows, separately from load on any one node. Default 2 (one publisher, one subscriber). Ignored if `SERVER_URLS` is set.
+* `SERVER_URLS`: a comma-separated list of server base URLs to use instead of the `server1..serverN` docker-compose naming (e.g. `https://bench-server-1.example.com,https://bench-server-2.example.com`). Use this to point the driver at servers deployed somewhere other than this docker-compose setup (i.e. cloud provider). The first URL is always the publish target; the rest are subscribers, same as `NUM_SERVERS`. At least 2 URLs are required.
+* `CLIENTS_PER_SERVER`: the number of clients to connect to *each* subscriber node. Total clients connected = `CLIENTS_PER_SERVER * (NUM_SERVERS - 1)`, so every subscriber always carries equal load - raising `NUM_SERVERS` raises total client count too. Default 500.
 * `PUBLISH_COUNT`: The number of messages to publish. Default 20000.
-* `CONCURRENCY`: The maximum number of concurrent requests (from server). Default 128.
-* `PAYLOAD_BYTES`: The number of bytes in the payload. Default 128.
+* `CONCURRENCY`: The maximum number of concurrent `SendAsync` calls in flight on the server at any time, for the lifetime of the run. Default 128.
+* `PAYLOAD_BYTES`: The number of bytes of filler content included in each message's payload. Default 128.
 * `WARMUP_SECONDS`: The number of seconds to warm up. Default 10.
 * `MEASURE_SECONDS`: For `single` runs, the number of seconds to measure. Messages/second will be `PUBLISH_COUNT / MEASURE_SECONDS`.
+* `REPEATS_PER_RATE`: The number of independent trials to run at each rate (each rate in a `sweep`, or the single trial in `single` mode). Latency percentiles are computed over the pooled samples from all repeats; `Sent`/`Missing`/`Fanout Copies` are summed. Default 1.
+* `HEALTH_CHECK_TIMEOUT_SECONDS`: How long the driver waits (polling once per second) for each server's `/health` endpoint before giving up and failing the run. Default 60.
+* `DRAIN_QUIET_SECONDS`: After each repeat (including warmup's), every message carries the generation number of the window it was sent for - a straggler that arrives late always keeps its original generation, so it's rejected by comparing against the currently active one rather than trusting arrival timing. Before starting the next window, the driver waits until no such stragglers have arrived for this many seconds, rather than assuming a fixed delay is enough (which doesn't scale to slower/more congested runs, e.g. many clients or degraded infrastructure). Default 2.
+* `DRAIN_MAX_WAIT_SECONDS`: A cap on the above, in case stragglers never fully stop arriving - the run proceeds anyway with a warning rather than hanging forever. Default 60.
+* `PAYLOAD_STRATEGY`: Only applies when `BACKPLANE=postgres`
+    * `event` (default) sends payloads inline in the notification event.
+    * `table` uses PostgreSignalR's payload table strategy instead (`AddBackplaneTablePayloadStrategy` with `StorageMode=Always`). The server disables the library's own TTL-based row cleanup for this benchmark, so before each run the driver connects to `ConnectionStrings__Postgres` directly and truncates the `backplane_payloads` table itself - this matters most on Railway, where the same Postgres instance is reused across every scenario instead of being torn down like local docker-compose's is.
+
+The `sweep` output table's `Rate (msg/s)` column is the offered rate, i.e. what the driver was asked to send - it is not necessarily what was achieved. The `Achieved (msg/s)` column is the rate actually measured (messages sent / actual dispatch time), which falls below the target once the driver or server can't keep up. When achieved rate drops more than 5% below target, a warning is printed, since the latency figures on that row reflect the achieved rate, not the labeled one. The same applies to `single` mode's `Sent ... achieved` line.
+
+## Connection strings
+
+`ConnectionStrings__Postgres` and `ConnectionStrings__Redis` accept either the native keyword=value formats Npgsql/StackExchange.Redis expect, or a `postgres://`/`postgresql://` and `redis://`/`rediss://` URI - the format most cloud providers  hand out as `DATABASE_URL`/`REDIS_URL`. URIs are converted automatically (`rediss://` and a Postgres URI's `sslmode` query param both map through correctly); values already in native format are passed through unchanged, so the local docker-compose setup is unaffected. This lets `server`, `shared-load`, and the driver's backplane connections point at a real managed database instead of the containers the compose file provisions.
+
+Any other query param on a `postgres://` URI is passed straight through as an Npgsql connection string keyword (e.g. `?MaxPoolSize=10&MinPoolSize=10`), so pool tuning can be done entirely via the Railway variable value without code changes - e.g. appending `?MaxPoolSize=10&MinPoolSize=10` to the `server1`/`server2` services' `ConnectionStrings__Postgres` value (`${{Postgres.DATABASE_URL}}?MaxPoolSize=10&MinPoolSize=10`) keeps a small, pre-warmed pool of persistent connections instead of growing on demand up to Npgsql's default of 100.
+
+## Dedicated vs. Shared Backplane
+
+By default the benchmarks give Postgres/Redis to the backplane exclusively - nothing else is talking to them. That's a best case, and not how these are typically deployed in production: Redis is frequently shared with other caching/session traffic, and the whole point of a Postgres backplane is usually to reuse a database you already run for your application, not stand up a dedicated instance.
+
+`PostgreSignalR.Benchmarks.SharedLoad` simulates that other traffic. It runs a simple, continuous CRUD-ish workload (mostly writes/reads, occasional updates and cleanup deletes for Postgres; mostly sets/gets, occasional counters and deletes for Redis) against the same Postgres database or Redis instance used as the backplane, in a separate table/keyspace so it doesn't interact with SignalR's own messages - it just simulates realistic CPU/IO/connection/lock contention.
+
+* `SIMULATE_SHARED_LOAD`: `true` to enable the generator, `false` (default) to leave it idle.
+* `SHARED_LOAD_CONCURRENCY`: number of parallel workers generating load. Default 16.
+* `SHARED_LOAD_OPS_PER_SEC`: approximate total operations/second across all workers. Default 200.
+
+To compare all four scenarios:
+
+```
+# Dedicated Redis backplane
+BACKPLANE=redis MODE=sweep docker compose up --build --abort-on-container-exit --exit-code-from driver
+
+# Dedicated Postgres backplane
+BACKPLANE=postgres MODE=sweep docker compose up --build --abort-on-container-exit --exit-code-from driver
+
+# Shared Redis backplane
+BACKPLANE=redis SIMULATE_SHARED_LOAD=true MODE=sweep docker compose up --build --abort-on-container-exit --exit-code-from driver
+
+# Shared Postgres backplane
+BACKPLANE=postgres SIMULATE_SHARED_LOAD=true MODE=sweep docker compose up --build --abort-on-container-exit --exit-code-from driver
+```
+
+## Recreating all my Benchmarks
+
+I generated `run-comparisons.sh` to run a set of 16 predefined scenarios that I think give a good comparison across several different use cases, grouped into four questions:
+
+1. `redis`/`postgres`-`dedicated`/`shared`: the core backplane comparison, with a rate sweep up to 2000 msg/s - this doubles as "what's the max sustainable publish rate" discovery.
+2. `postgres-*-table`: same, but the payload-table strategy instead of the default event one.
+3. `*-clients-N`: fixed low rate (10-100 msg/s, a realistic occasional-broadcast pattern rather than a firehose), with the client count per server pushed up in steps (500/2000/4000) - "what's the max sustainable client count" discovery.
+4. `*-dedicated-Nservers`: fixed client count/rate, but spreading load across more subscriber nodes - fan-out width, a different axis from the above.
+
+Each scenario's rate sweep, client count, and other parameters are baked in per-scenario (see `run-comparisons.sh --list` for the exact values) rather than configurable via environment variables, since the whole point is a fixed, repeatable matrix - edit the `scenarios` array directly if you want different values. Scenarios in groups 1-2 and 4 take roughly 20-30 minutes each; group 3's scenarios are quicker given their smaller rate sweep. The full suite takes several hours.
+
+If you're just interested in running certain scenarios, you can execute `run-comparisons.sh --list` to see all of them and list scenarios out to run, like `run-comparisons.sh redis-dedicated postgres-shared`.
+
+Logs are saved to `results/<timestamp>/<scenario>.log`
+
+## Running on Railway
+
+Local docker-compose puts everything on one Docker host, which doesn't approximate a real deployment (no real network hops, all services sharing the same CPU/memory). `run-comparisons-railway.sh` runs the same scenario matrix against a real Railway project instead, with `SERVER_URLS` and the URI-style connection string support (see "Connection strings" above) doing the work of pointing the same driver/server/shared-load images at cloud infrastructure instead of docker-compose's containers.
+
+This needs a one-time setup - see [RAILWAY_SETUP.md](RAILWAY_SETUP.md), which also documents the parts of the script that are best-effort and not yet confirmed against a live Railway account. Once set up:
+
+```
+./benchmarks/run-comparisons-railway.sh --list                 # same matrix as run-comparisons.sh
+./benchmarks/run-comparisons-railway.sh redis-dedicated         # dry-run: prints the commands only
+./benchmarks/run-comparisons-railway.sh --apply redis-dedicated # runs it for real
+```
+
+It defaults to dry-run (printing the `railway` commands rather than running them) since it hasn't been tested against a live account - pass `--apply` once you've sanity-checked the commands.

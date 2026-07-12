@@ -1,3 +1,18 @@
+x-server: &server
+  build:
+    context: .
+    dockerfile: benchmarks/PostgreSignalR.Benchmarks.Server/Dockerfile
+  environment:
+    ASPNETCORE_ENVIRONMENT: Production
+    Logging__LogLevel__Default: Warning
+    BACKPLANE: ${BACKPLANE:-none}
+    ConnectionStrings__Redis: redis:6379
+    ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
+    PAYLOAD_STRATEGY: ${PAYLOAD_STRATEGY:-event}
+  depends_on:
+    - postgres
+    - redis
+
 services:
   postgres:
     image: postgres:16
@@ -8,58 +23,109 @@ services:
     ports:
       - "5432:5432"
 
-  # redis:
-  #   image: redis:7
-  #   ports:
-  #     - "6379:6379"
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
 
-  servera:
-    build:
-      context: .
-      dockerfile: benchmarks/PostgreSignalR.Benchmarks.Server/Dockerfile
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      Logging__LogLevel__Default: Warning
-      BACKPLANE: ${BACKPLANE:-none}
-      # ConnectionStrings__Redis: redis:6379
-      ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
-      MAKETABLE: true
-    depends_on:
-      - postgres
-      # - redis
+  server1:
+    <<: *server
     ports:
       - "8081:8080"
 
-  serverb:
+  server2:
+    <<: *server
+    ports:
+      - "8082:8080"
+
+  server3:
+    <<: *server
+    ports:
+      - "8083:8080"
+
+  server4:
+    <<: *server
+    ports:
+      - "8084:8080"
+
+  server5:
+    <<: *server
+    ports:
+      - "8085:8080"
+
+  server6:
+    <<: *server
+    ports:
+      - "8086:8080"
+
+  server7:
+    <<: *server
+    ports:
+      - "8087:8080"
+
+  server8:
+    <<: *server
+    ports:
+      - "8088:8080"
+
+  server9:
+    <<: *server
+    ports:
+      - "8089:8080"
+
+  server10:
+    <<: *server
+    ports:
+      - "8090:8080"
+
+  shared-load:
     build:
       context: .
-      dockerfile: benchmarks/PostgreSignalR.Benchmarks.Server/Dockerfile
+      dockerfile: benchmarks/PostgreSignalR.Benchmarks.SharedLoad/Dockerfile
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      Logging__LogLevel__Default: Warning
       BACKPLANE: ${BACKPLANE:-none}
-      # ConnectionStrings__Redis: redis:6379
+      SIMULATE_SHARED_LOAD: ${SIMULATE_SHARED_LOAD:-false}
+      SHARED_LOAD_CONCURRENCY: ${SHARED_LOAD_CONCURRENCY:-16}
+      SHARED_LOAD_OPS_PER_SEC: ${SHARED_LOAD_OPS_PER_SEC:-200}
+      ConnectionStrings__Redis: redis:6379
       ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
     depends_on:
       - postgres
-      # - redis
-    ports:
-      - "8082:8080"
+      - redis
 
   driver:
     build:
       context: .
       dockerfile: benchmarks/PostgreSignalR.Benchmarks/Dockerfile
     environment:
-      SERVER_A: http://servera:8080
-      SERVER_B: http://serverb:8080
+      NUM_SERVERS: ${NUM_SERVERS:-2}
       MODE: ${MODE:-single}
-      CLIENTS: ${CLIENTS:-500}
+      CLIENTS_PER_SERVER: ${CLIENTS_PER_SERVER:-500}
       PUBLISH_COUNT: ${PUBLISH_COUNT:-20000}
       CONCURRENCY: ${CONCURRENCY:-128}
       PAYLOAD_BYTES: ${PAYLOAD_BYTES:-128}
       WARMUP_SECONDS: ${WARMUP_SECONDS:-10}
       MEASURE_SECONDS: ${MEASURE_SECONDS:-30}
+      TARGET_RATE: ${TARGET_RATE:-100}
+      SLO_P99_MS: ${SLO_P99_MS:-250}
+      SWEEP_START_RATE: ${SWEEP_START_RATE:-100}
+      SWEEP_STEP_RATE: ${SWEEP_STEP_RATE:-100}
+      SWEEP_MAX_RATE: ${SWEEP_MAX_RATE:-2000}
+      SWEEP_TRIAL_SECONDS: ${SWEEP_TRIAL_SECONDS:-15}
+      BATCH_SIZE: ${BATCH_SIZE:-25}
+      REPEATS_PER_RATE: ${REPEATS_PER_RATE:-1}
+      HEALTH_CHECK_TIMEOUT_SECONDS: ${HEALTH_CHECK_TIMEOUT_SECONDS:-60}
+      DRAIN_QUIET_SECONDS: ${DRAIN_QUIET_SECONDS:-1}
+      DRAIN_MAX_WAIT_SECONDS: ${DRAIN_MAX_WAIT_SECONDS:-60}
     depends_on:
-      - servera
-      - serverb
+      - server1
+      - server2
+      - server3
+      - server4
+      - server5
+      - server6
+      - server7
+      - server8
+      - server9
+      - server10
+      - shared-load
