@@ -14,12 +14,12 @@ var usePayloadTable = (Environment.GetEnvironmentVariable("PAYLOAD_STRATEGY") ??
 
 if (backplane is "redis")
 {
-    var connectionString = ConnectionStringHelper.NormalizeRedis(Environment.GetEnvironmentVariable("ConnectionStrings__Redis") ?? throw new Exception());
+    var connectionString = ConnectionStringHelper.NormalizeRedis(Environment.GetEnvironmentVariable("ConnectionStrings__Redis") ?? throw new Exception("ConnectionStrings__Redis is required when BACKPLANE=redis but was not set."));
     builder.Services.AddSignalR().AddStackExchangeRedis(connectionString);
 }
 else if (backplane is "postgres")
 {
-    var connectionString = ConnectionStringHelper.NormalizePostgres(Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception());
+    var connectionString = ConnectionStringHelper.NormalizePostgres(Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? throw new Exception("ConnectionStrings__Postgres is required when BACKPLANE=postgres but was not set."));
     var signalrBuilder = builder.Services.AddSignalR().AddPostgresBackplane(connectionString);
 
     if (usePayloadTable)
@@ -39,11 +39,13 @@ if (backplane is "postgres" && usePayloadTable)
     await app.InitializePostgresBackplanePayloadTableAsync();
 }
 
+SemaphoreSlim? publishSemaphore = null;
+
 app.MapHub<BenchmarkHub>("/hub");
 
 app.MapGet("/health", () => Results.Ok(new { ok = true, backplane, payloadStrategy = usePayloadTable ? "table" : "event" }));
 
-SemaphoreSlim? publishSemaphore = null;
+app.MapGet("/time", () => Results.Ok(new { unixTimeMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }));
 
 app.MapPost("/publish", async (PublishRequest request, IHubContext<BenchmarkHub> hub, CancellationToken c) =>
 {

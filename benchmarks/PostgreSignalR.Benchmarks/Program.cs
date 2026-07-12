@@ -82,6 +82,9 @@ using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
 
 await Task.WhenAll(serverUrls.Select(url => WaitHealthy(http, url, healthCheckTimeoutSeconds)));
 
+var (clockOffsetMs, clockOffsetBestRoundTripMs) = await EstimateClockOffsetMsAsync(http, publisherUrl);
+Console.WriteLine($"Estimated clock offset vs publisher ({publisherUrl}): {clockOffsetMs}ms ({(clockOffsetMs >= 0 ? "publisher ahead" : "publisher behind")}, best round-trip {clockOffsetBestRoundTripMs}ms)");
+
 if ((backplane, payloadStrategy) is ("postgres", "table"))
 {
     var postgresConnectionString = ConnectionStringHelper.NormalizePostgres(Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ?? "");
@@ -145,7 +148,7 @@ for (int i = 0; i < clients; i++)
             return;
         }
 
-        var rawLatencyUs = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.SentUnixTimeMs) * 1000;
+        var rawLatencyUs = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - message.SentUnixTimeMs + clockOffsetMs) * 1000;
 
         if (rawLatencyUs < 0)
         {
@@ -377,6 +380,45 @@ static async Task WaitHealthy(HttpClient http, string baseUrl, int timeoutSecond
     }
 
     throw new Exception($"Health check failed for {baseUrl} after {timeoutSeconds}s");
+}
+
+static async Task<(long OffsetMs, long BestRoundTripMs)> EstimateClockOffsetMsAsync(HttpClient http, string serverUrl)
+{
+    var bestOffsetMs = 0D;
+    var bestRoundTripMs = double.MaxValue;
+
+    for (int i = 0; i < 15; i++)
+    {
+        var t0 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        TimeResult? response;
+
+        try
+        {
+            response = await http.GetFromJsonAsync<TimeResult>($"{serverUrl.TrimEnd('/')}/time");
+        }
+        catch
+        {
+            continue;
+        }
+
+        var t2 = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        if (response is null)
+        {
+            continue;
+        }
+
+        var roundTripMs = t2 - t0;
+
+        if (roundTripMs < bestRoundTripMs)
+        {
+            bestRoundTripMs = roundTripMs;
+            bestOffsetMs = response.UnixTimeMs - (t0 + t2) / 2.0;
+        }
+    }
+
+    var boundedRoundTripMs = bestRoundTripMs == double.MaxValue ? 0 : (long)Math.Round(bestRoundTripMs);
+    return ((long)Math.Round(bestOffsetMs), boundedRoundTripMs);
 }
 
 static async Task DrainAsync(Counter generation, Counter staleGeneration, Counter lastStaleTicks, double quietSeconds, double maxWaitSeconds)
