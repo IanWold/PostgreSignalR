@@ -16,7 +16,7 @@ builder.Services
         //     * Auto: only uses the payload table when the payloads are too large
         //     * Always: uses the payload table for all payloads
         // Auto is the default, since most workloads should not have large payloads.
-        options.StorageMode = PostgresBackplanePayloadTableStorage.Auto;
+        options.StorageMode = PayloadTableStorage.Auto;
         // options.StorageMode = PostgresBackplanePayloadTableStorage.Always;
         
         
