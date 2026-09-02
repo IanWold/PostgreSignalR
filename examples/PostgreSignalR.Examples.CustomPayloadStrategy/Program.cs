@@ -22,7 +22,7 @@ builder.Services
 //     so it will effectively be singleton in memory anyway.
 // If you have multiple hubs and some particular construction logic in the strategy,
 //     it may be necessary to register this as transient.
-builder.Services.AddSingleton<IPostgresBackplanePayloadStrategy, CustomPayloadStrategy>();
+builder.Services.AddSingleton<IPayloadStrategy, CustomPayloadStrategy>();
 
 var app = builder.Build();
 

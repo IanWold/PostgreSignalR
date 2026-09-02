@@ -8,11 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="PostgreSignalR" Version="0.3.3-alpha" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/PostgreSignalR.csproj" />
     <ProjectReference Include="../PostgreSignalR.Benchmarks.Abstractions/PostgreSignalR.Benchmarks.Abstractions.csproj" />
   </ItemGroup>
 

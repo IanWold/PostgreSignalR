@@ -19,7 +19,7 @@ builder.Services
         // Storage mode determines when paylaods are written to the payload table.
         // Always will write all payloads to the table,
         //     Auto will only write large payloads to the table.
-        options.StorageMode = PostgresBackplanePayloadTableStorage.Always;
+        options.StorageMode = PayloadTableStorage.Always;
         // options.StorageMode = PostgresBackplanePayloadTableStorage.Auto;
 
 

@@ -9,7 +9,10 @@
 
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="10.0.3" />
-    <PackageReference Include="PostgreSignalR" Version="0.3.2-alpha" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/PostgreSignalR.csproj" />
   </ItemGroup>
 
 	<ItemGroup>

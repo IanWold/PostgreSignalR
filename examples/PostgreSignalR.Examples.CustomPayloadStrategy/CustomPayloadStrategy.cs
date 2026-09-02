@@ -7,7 +7,7 @@ namespace PostgreSignalR.Examples.CustomPayloadStrategy;
 // Inject IOptions<PostgresBackplaneOptions> backplaneOptions to get the npgsql data source
 //     that was configured along with the backplane.
 // This ensures consistency.
-public class CustomPayloadStrategy(IOptions<PostgresBackplaneOptions> backplaneOptions) : IPostgresBackplanePayloadStrategy
+public class CustomPayloadStrategy(IOptions<PostgresBackplaneOptions> backplaneOptions) : IPayloadStrategy
 {
     // This method is called whenever we need to NOTIFY in postgres.
     // This method should NOT modify the channel name or message.
