@@ -10,7 +10,7 @@
 
 A **non-opinionated** and easily **configurable** PostgreSQL backplane for SignalR
 
-_Currently in beta and happy for your feedback!_
+_Currently in Release Candidate stage and happy for your feedback!_
 
 </div>
 
