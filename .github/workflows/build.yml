@@ -26,7 +26,7 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Test
-      run: dotnet test tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj -f ${{ matrix.tfm }} --no-build --verbosity normal --blame-hang --blame-hang-timeout 2m --blame-hang-dump-type mini -- --stop-on-fail on
+      run: dotnet test --project tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj -f ${{ matrix.tfm }} --no-build --output Detailed --hangdump --hangdump-timeout 2m --hangdump-type Mini --stop-on-fail on
       timeout-minutes: 10
 
   build-status:
