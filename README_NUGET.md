@@ -77,20 +77,20 @@ For more advanced use cases, PostgreSignalR allows you to create a custom payloa
 
 # Roadmap
 
-This library is brand-new, so while it should support all SignalR features it hasn't been thoroughly tested and vetted for production use. The immediate next steps are aimed at making this production-ready:
+PostgreSignalR is ready for production use: it supports all SignalR features, is covered by an integration test suite that runs against every supported .NET version, and is already running in production systems.
 
-1. Automated tests to ensure the functionality of the library
-2. Performance tests and benchmarks to optimize the code and find at-scale bugs
-3. Writing one or several example applications utilizing all of the SignalR features
-4. Adding additional configuration options to allow more flexibility in error handling
+## Versioning
 
-Right now the library has been released on Nuget in an alpha version, denoting that it is relatively untested _and_ the API may be subject to change. In this case, the "API" consists entirely of the dependency injection extensions and the `PostgresOptions` class. The beta, rc, and prod milestones will denote:
+PostgreSignalR follows [Semantic Versioning](https://semver.org/). The public API consists of the dependency injection extensions, the options classes (`PostgresBackplaneOptions` and `PayloadTableOptions`), and the payload strategy types (`IPayloadStrategy`, `EventPayloadStrategy`, and `TablePayloadStrategy`). Breaking changes to any of these will only be made in a new major version.
 
-* Beta: Testing has given confidence that this is a viable product and major bugs and performance issues have been resolved
-* RC: Further changes to the interface are unlikely and testing has indicated that the product is stable
-* Prod: The library is ready for use in production systems
+PostgreSignalR targets every version of .NET that is [currently supported by Microsoft](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core). Support for new .NET versions is added in minor versions, and support for a .NET version is dropped in a new major version once Microsoft stops supporting it.
 
-Alpha and beta versions will progress through `0.x.0-alpha` and `0.x.0-beta`, while the release candidates will start at `1.0.0-rc.x`. `1.0.0` will be the first production release.
+## Next Steps
+
+1. Finish the benchmark suite to provide reliable documentation about the performance of the library at the edge
+2. Add configuration options to allow more flexibility in error handling
+
+Contributions are welcome!
 
 # Developing and Testing
 

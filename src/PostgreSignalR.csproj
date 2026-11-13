@@ -12,6 +12,7 @@
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.5.0-rc-1</PackageValidationBaselineVersion>
 
     <PackageTags>SignalR;Postgres;PostgreSQL;Npgsql;ASP;ASPNET;ASPNETCORE</PackageTags>
     <RepositoryUrl>https://github.com/IanWold/PostgreSignalR</RepositoryUrl>
