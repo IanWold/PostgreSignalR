@@ -1,5 +1,5 @@
 # Build Stage
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /work
 
 COPY ./src ./src
@@ -7,10 +7,10 @@ COPY ./tests/PostgreSignalR.IntegrationTests.Abstractions ./tests/PostgreSignalR
 COPY ./tests/PostgreSignalR.IntegrationTests.App ./tests/PostgreSignalR.IntegrationTests.App
 
 WORKDIR /work/tests/PostgreSignalR.IntegrationTests.App
-RUN dotnet publish -c Release -o /app/publish --framework net8.0 --no-cache
+RUN dotnet publish -c Release -o /app/publish --framework net11.0 --no-cache
 
 # Runtime Stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish ./
 

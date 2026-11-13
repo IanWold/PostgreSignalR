@@ -111,12 +111,10 @@ public class ContainerFixture : IAsyncLifetime
 
         TestServerImage = new ImageFromDockerfileBuilder()
             .WithDockerfileDirectory(CommonDirectoryPath.GetSolutionDirectory().DirectoryPath)
-#if NET10_0
+#if NET11_0
+            .WithDockerfile("Dockerfile.integrationTests.net11")
+#elif NET10_0
             .WithDockerfile("Dockerfile.integrationTests.net10")
-#elif NET9_0
-            .WithDockerfile("Dockerfile.integrationTests.net9")
-#elif NET8_0
-            .WithDockerfile("Dockerfile.integrationTests.net8")
 #endif
             .Build();
 

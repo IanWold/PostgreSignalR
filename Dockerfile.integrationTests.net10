@@ -7,7 +7,7 @@ COPY ./tests/PostgreSignalR.IntegrationTests.Abstractions ./tests/PostgreSignalR
 COPY ./tests/PostgreSignalR.IntegrationTests.App ./tests/PostgreSignalR.IntegrationTests.App
 
 WORKDIR /work/tests/PostgreSignalR.IntegrationTests.App
-RUN dotnet publish -c Release -o /app/publish --framework net10.0 --no-cache
+RUN dotnet publish -c Release -o /app/publish --framework net10.0 -p:TargetFrameworks=net10.0 --no-cache
 
 # Runtime Stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
