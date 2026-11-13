@@ -25,6 +25,8 @@ jobs:
       run: dotnet restore
     - name: Build
       run: dotnet build --no-restore
+    - name: Validate package
+      run: dotnet pack src/PostgreSignalR.csproj --no-build -c Debug
     - name: Test
       run: dotnet test --project tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj -f ${{ matrix.tfm }} --no-build --output Detailed --hangdump --hangdump-timeout 2m --hangdump-type Mini --stop-on-fail on
       timeout-minutes: 10
