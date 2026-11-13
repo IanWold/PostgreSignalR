@@ -8,7 +8,7 @@ This is great, but what if [I really like Postgres](https://ian.wold.guru/Posts/
 
 # Getting Started
 
-Setting up the Postgres backplane for SignalR is very simple. If you've configured the [official Redis backplane](https://learn.microsoft.com/en-us/aspnet/core/signalr/redis-backplane?view=aspnetcore-10.0) before these steps will be quite simple.
+Setting up the Postgres backplane for SignalR is very simple. If you've configured the [official Redis backplane](https://learn.microsoft.com/en-us/aspnet/core/signalr/redis-backplane?view=aspnetcore-11.0) before these steps will be quite simple.
 
 1. You'll need a Postgres server of course; deploy a new one or use your exisitng database
 2. Install the [PostgreSignalR Nuget package](https://www.nuget.org/packages/PostgreSignalR) in your server project
@@ -122,7 +122,7 @@ public async Task Test()
 
 ### Building and Testing Locally
 
-To build, all you'll need is [the .NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). If you're interested in setting up a separate local project to use your development version of this library, you can follow [Microsoft's guide on local Nuget feeds](https://learn.microsoft.com/en-us/nuget/hosting-packages/local-feeds).
+To build, all you'll need is [the .NET 11 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/11.0). If you're interested in setting up a separate local project to use your development version of this library, you can follow [Microsoft's guide on local Nuget feeds](https://learn.microsoft.com/en-us/nuget/hosting-packages/local-feeds).
 
 In order to execute the tests locally, you'll need to have Docker installed. I recommend installing [Docker Desktop](https://www.docker.com/products/docker-desktop/) for ease of use, but any Docker-compatible container engine/interface should work fine. Docker Desktop works out of the box, for the most part. Your favorite C# IDE should have a test explorer, you can run the tests like normal from there, just be sure Docker is running before you run the tests. If you're using VSCode like I am, I recommend installing [the C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit).
 

@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 
 # Copy the rest of the source
@@ -10,7 +10,7 @@ RUN dotnet restore benchmarks/PostgreSignalR.Benchmarks/PostgreSignalR.Benchmark
 # Publish
 RUN dotnet publish benchmarks/PostgreSignalR.Benchmarks/PostgreSignalR.Benchmarks.csproj -c Release -o /out --no-restore
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0
+FROM mcr.microsoft.com/dotnet/runtime:11.0
 WORKDIR /app
 
 COPY --from=build /out .
