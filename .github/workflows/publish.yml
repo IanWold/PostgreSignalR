@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   build:
@@ -23,5 +24,10 @@ jobs:
         VERSION="${arrTag[2]}"
         VERSION="${VERSION//v}"
         dotnet pack src/PostgreSignalR.csproj -c Release -p:PackageVersion=$VERSION
+    - name: NuGet login
+      uses: NuGet/login@v1
+      id: nuget-login
+      with:
+        user: ${{ secrets.NUGET_USER }}
     - name: Publish
-      run: dotnet nuget push "**/PostgreSignalR.*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key ${{ secrets.NUGET_KEY }} --skip-duplicate
+      run: dotnet nuget push "**/PostgreSignalR.*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --skip-duplicate
