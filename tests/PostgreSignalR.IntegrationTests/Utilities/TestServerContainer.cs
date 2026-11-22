@@ -6,12 +6,18 @@ public class TestServerContainer(IContainer container) : IAsyncDisposable
 {
     public Uri HubUri =>
         new($"http://localhost:{container.GetMappedPublicPort(8080)}/hub");
+
+    public Uri SecondHubUri =>
+        new($"http://localhost:{container.GetMappedPublicPort(8080)}/second-hub");
     
     public Uri HealthUri =>
         new($"http://localhost:{container.GetMappedPublicPort(8080)}/health");
 
     public Uri ListenerDiagnosticsUri =>
         new($"http://localhost:{container.GetMappedPublicPort(8080)}/diagnostics/listener");
+
+    public Uri HubDiagnosticsUri =>
+        new($"http://localhost:{container.GetMappedPublicPort(8080)}/diagnostics/hubs");
 
     public Uri PayloadDiagnosticsUri =>
         new($"http://localhost:{container.GetMappedPublicPort(8080)}/diagnostics/payload");

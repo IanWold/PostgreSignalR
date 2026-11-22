@@ -53,6 +53,19 @@ builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
 });
 ```
 
+### Choosing Hubs
+
+By default, every hub in your app uses the backplane. To use it for only some hubs, add each one with `AddBackplaneHub`:
+
+```csharp
+builder.Services.AddSignalR()
+    .AddPostgresBackplane(dataSource)
+    .AddBackplaneHub<ChatHub>()
+    .AddBackplaneHub<NotificationHub>();
+```
+
+The hubs you don't add use SignalR's default lifetime manager, so their messages only reach connections on the same server and their connections never touch Postgres. This helps when some hubs never need to send messages between servers, like the circuit hub in a Blazor Server app.
+
 ### Channel Routing
 
 By default, each server LISTENs on a Postgres channel for each of its connections, users, and groups, so it only receives the messages for its own targets. That means connecting, disconnecting, and the first join or last leave of a group on a server each run a LISTEN or UNLISTEN.

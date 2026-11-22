@@ -73,10 +73,54 @@ public static class AspExtensions
         signalrBuilder.Services.AddOptions<PostgresBackplaneOptions>().Configure(configure);
 
         signalrBuilder.Services.AddSingleton<IPayloadStrategy, EventPayloadStrategy>();
-        signalrBuilder.Services.AddSingleton(typeof(HubLifetimeManager<>), typeof(PostgresHubLifetimeManager<>));
-        
+
+        // Every hub uses the backplane, unless hubs have been chosen with AddBackplaneHub.
+        if (!signalrBuilder.Services.Any(IsSingleHubRegistration))
+        {
+            signalrBuilder.Services.AddSingleton(typeof(HubLifetimeManager<>), typeof(PostgresHubLifetimeManager<>));
+        }
+
         return signalrBuilder;
     }
+
+    /// <summary>
+    /// Uses the Postgres backplane for <typeparamref name="THub"/>.
+    /// Once any hub is added this way, only the added hubs use the backplane. The others use SignalR's default lifetime manager,
+    /// so their messages only reach connections on the same server.
+    /// </summary>
+    /// <remarks>
+    /// If no hubs are added, every hub uses the backplane.
+    /// This still requires <c>AddPostgresBackplane</c>, and can be called before or after it.
+    /// </remarks>
+    /// <typeparam name="THub">The hub to use the backplane for.</typeparam>
+    /// <param name="signalrBuilder">The <see cref="ISignalRServerBuilder"/>.</param>
+    /// <returns>The same instance of the <see cref="ISignalRServerBuilder"/> for chaining.</returns>
+    public static ISignalRServerBuilder AddBackplaneHub<THub>(this ISignalRServerBuilder signalrBuilder) where THub : Hub
+    {
+        var services = signalrBuilder.Services;
+
+        for (var i = services.Count - 1; i >= 0; i--)
+        {
+            if (IsAllHubsRegistration(services[i]))
+            {
+                services.RemoveAt(i);
+            }
+        }
+
+        services.AddSingleton<HubLifetimeManager<THub>, PostgresHubLifetimeManager<THub>>();
+
+        return signalrBuilder;
+    }
+
+    private static bool IsAllHubsRegistration(ServiceDescriptor descriptor) =>
+        !descriptor.IsKeyedService
+        && descriptor.ServiceType == typeof(HubLifetimeManager<>)
+        && descriptor.ImplementationType == typeof(PostgresHubLifetimeManager<>);
+
+    private static bool IsSingleHubRegistration(ServiceDescriptor descriptor) =>
+        !descriptor.IsKeyedService
+        && descriptor.ImplementationType is { IsConstructedGenericType: true } implementationType
+        && implementationType.GetGenericTypeDefinition() == typeof(PostgresHubLifetimeManager<>);
 
     /// <summary>
     /// Configures the Postgres backplane to store payloads in a table.
