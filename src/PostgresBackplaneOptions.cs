@@ -44,6 +44,11 @@ public enum ChannelRouting
 public delegate void OnInitializedHandler();
 
 /// <summary>
+/// Handler for <see cref="PostgresBackplaneOptions.OnReconnected"/>
+/// </summary>
+public delegate void OnReconnectedHandler();
+
+/// <summary>
 /// Options to configure the Postgres backplane
 /// </summary>
 public class PostgresBackplaneOptions
@@ -101,8 +106,21 @@ public class PostgresBackplaneOptions
     /// </remarks>
     public event OnInitializedHandler? OnInitialized;
 
+    /// <summary>
+    /// Configures a callback invoked each time the backplane reconnects to Postgres after losing its connection.
+    /// Default: <c>null</c>
+    /// </summary>
+    /// <remarks>
+    /// Messages sent while the backplane was disconnected are lost, so use this to resync anything clients may have missed.
+    /// Each hub has its own connection, so this is invoked once for each hub that reconnects.
+    /// </remarks>
+    public event OnReconnectedHandler? OnReconnected;
+
     internal void InvokeOnInitialized() =>
         OnInitialized?.Invoke();
+
+    internal void InvokeOnReconnected() =>
+        OnReconnected?.Invoke();
 
     internal bool IsValid(out string? message)
     {

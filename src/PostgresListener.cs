@@ -24,6 +24,8 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logg
 
     public event EventHandler<NpgsqlNotificationEventArgs>? OnNotification;
 
+    public event EventHandler? OnReconnected;
+
     internal int ChannelCount => Volatile.Read(ref _channelCount);
 
     internal long ListenCount => Interlocked.Read(ref _listenCount);
@@ -50,7 +52,8 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logg
                 return;
             }
 
-            Task<bool> wait;
+            Task<bool>? wait = null;
+            var reconnected = false;
 
             // Enqueue wakes the pump by cancelling _waitCts while holding _gate. Npgsql can miss a cancellation that arrives
             // while WaitAsync is still starting, so the pump starts waiting while holding _gate too: a wakeup then arrives
@@ -67,17 +70,28 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logg
 
                 if (!_pendingCommands.IsEmpty)
                 {
-                    await RunPendingCommandsAsync();
-                    continue;
+                    reconnected = await RunPendingCommandsAsync();
                 }
-
-                // Also wake every PendingCommandCheckInterval, so if a wakeup is ever missed, commands are delayed
-                // rather than left waiting for the next notification. SubscribeAsync waits for its command to run.
-                wait = StartWaiting(connection);
+                else
+                {
+                    // Also wake every PendingCommandCheckInterval, so if a wakeup is ever missed, commands are delayed
+                    // rather than left waiting for the next notification. SubscribeAsync waits for its command to run.
+                    wait = StartWaiting(connection);
+                }
             }
             finally
             {
                 _gate.Release();
+            }
+
+            if (reconnected)
+            {
+                OnReconnected?.Invoke(this, EventArgs.Empty);
+            }
+
+            if (wait is null)
+            {
+                continue;
             }
 
             try
@@ -95,6 +109,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logg
             catch
             {
                 await ReconnectAsync(_cts.Token);
+                OnReconnected?.Invoke(this, EventArgs.Empty);
             }
         }
     }
@@ -112,13 +127,14 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logg
     }
 
     /// <summary>
-    /// Runs every pending command in one round trip. Must be called while holding <see cref="_gate"/>.
+    /// Runs every pending command in one round trip, reconnecting if that fails. Returns whether it reconnected.
+    /// Must be called while holding <see cref="_gate"/>.
     /// </summary>
-    private async Task RunPendingCommandsAsync()
+    private async Task<bool> RunPendingCommandsAsync()
     {
         if (_pendingCommands.IsEmpty)
         {
-            return;
+            return false;
         }
 
         var batch = new List<PendingCommand>();
@@ -126,6 +142,8 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logg
         {
             batch.Add(command);
         }
+
+        var reconnected = false;
 
         try
         {
@@ -138,6 +156,7 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logg
             {
                 // Reconnecting LISTENs on every channel in _channels, which already reflects every command in the batch.
                 await ReconnectWithRetryCoreAsync(_cts.Token);
+                reconnected = true;
             }
         }
         catch
@@ -154,6 +173,8 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logg
         {
             command.Completion.TrySetResult();
         }
+
+        return reconnected;
     }
 
     private async Task ReconnectAsync(CancellationToken ct)
@@ -172,24 +193,17 @@ internal sealed class PostgresListener(NpgsqlDataSource dataSource, ILogger logg
 
     private async Task ReconnectWithRetryCoreAsync(CancellationToken ct)
     {
-        var failedAtLeastOnce = false;
-
         while (true)
         {
             try
             {
                 await ReconnectCoreAsync(ct);
-
-                if (failedAtLeastOnce)
-                {
-                    logger.BackplaneReconnected();
-                }
+                logger.BackplaneReconnected();
 
                 return;
             }
             catch (Exception ex) when (!ct.IsCancellationRequested)
             {
-                failedAtLeastOnce = true;
                 logger.BackplaneReconnectFailedRetrying(ReconnectRetryDelay, ex);
                 await Task.Delay(ReconnectRetryDelay, ct);
             }

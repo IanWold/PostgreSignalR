@@ -99,6 +99,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
 
         _postgresListener = new(options.Value.DataSource, logger);
         _postgresListener.OnNotification += OnNotification;
+        _postgresListener.OnReconnected += OnReconnected;
     }
 
     /// <summary>
@@ -874,6 +875,18 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
     {
         _ = _notificationHandlers.TryRemove(channelName, out _);
         await _postgresListener.UnsubscribeAsync(channelName);
+    }
+
+    private void OnReconnected(object? sender, EventArgs e)
+    {
+        try
+        {
+            _options.InvokeOnReconnected();
+        }
+        catch (Exception ex)
+        {
+            _logger.BackplaneErrorDuringOnReconnected(ex);
+        }
     }
 
     private void OnNotification(object? sender, NpgsqlNotificationEventArgs e)

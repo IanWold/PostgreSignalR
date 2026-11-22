@@ -77,6 +77,15 @@ builder.Services
             // If you need to run any logic at the time of initialization,
             //     subscribe to this event.
             options.OnInitialized += () => { /* Do something */ };
+
+
+
+            // The backplane receives messages from other servers over its own connection to Postgres.
+            // If that connection drops, the backplane reconnects on its own,
+            //     but any messages sent while it was disconnected are lost.
+            // If you need to resync your clients after a reconnect,
+            //     subscribe to this event.
+            options.OnReconnected += () => { /* Do something */ };
         }
     );
 

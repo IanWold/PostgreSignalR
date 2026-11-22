@@ -24,6 +24,35 @@ public abstract class ListenerConnectionTerminationTests(ContainerFixture fixtur
     }
 
     [RetryFact]
+    public async Task OnReconnectedIsRaisedOnceListenerIsListeningAgain()
+    {
+        await using var client1 = await Server1.CreateClientAsync();
+        await using var client2 = await Server2.CreateClientAsync();
+
+        var server1Before = await Server1.GetListenerDiagnosticsAsync();
+        var server2Before = await Server2.GetListenerDiagnosticsAsync();
+
+        var terminated = await TerminateListenerConnectionsAsync();
+        Assert.True(terminated >= 2, $"Expected to terminate at least 2 listener connections (one per server), but terminated {terminated}.");
+
+        await AssertEventuallySucceedsAsync(async () =>
+        {
+            var server1After = await Server1.GetListenerDiagnosticsAsync();
+            var server2After = await Server2.GetListenerDiagnosticsAsync();
+
+            Assert.True(server1After.ReconnectedCount > server1Before.ReconnectedCount, "Expected server 1 to raise OnReconnected.");
+            Assert.True(server2After.ReconnectedCount > server2Before.ReconnectedCount, "Expected server 2 to raise OnReconnected.");
+        });
+
+        // OnReconnected is raised once the listener is LISTENing again, so a message sent now is delivered without retrying.
+        var message = client2.ExpectMessageAsync(nameof(IClient.Message));
+
+        await client1.Send.SendToAll(ShortMessage);
+
+        Assert.Equal(ShortMessage, (await message).Arg<string>());
+    }
+
+    [RetryFact]
     public async Task BackplaneRecoversFromRepeatedDisruptions()
     {
         await using var client1 = await Server1.CreateClientAsync();

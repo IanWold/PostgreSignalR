@@ -147,7 +147,7 @@ internal static partial class LogExtensions
     [LoggerMessage(
         EventId = 200,
         Level = LogLevel.Information,
-        Message = "Postgres backplane reconnected after a prior failure."
+        Message = "Postgres backplane reconnected."
     )]
     public static partial void BackplaneReconnected(this ILogger logger);
 
@@ -164,4 +164,11 @@ internal static partial class LogExtensions
         Message = "Postgres backplane failed handling notification on channel {Channel}."
     )]
     public static partial void BackplaneFailedHandlingNotification(this ILogger logger, string channel, Exception exception);
+
+    [LoggerMessage(
+        EventId = 230,
+        Level = LogLevel.Warning,
+        Message = "Postgres backplane encountered error while handling OnReconnected event. Ignoring."
+    )]
+    public static partial void BackplaneErrorDuringOnReconnected(this ILogger logger, Exception ex);
 }

@@ -31,7 +31,8 @@ builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
     options.Prefix = "myapp";
     options.ChannelNameNormaization = ChannelNameNormaization.Truncate;
     options.ChannelRouting = ChannelRouting.PerTarget;
-    options.OnInitialized += () => { /* Do something */ }
+    options.OnInitialized += () => { /* Do something */ };
+    options.OnReconnected += () => { /* Do something */ };
 });
 ```
 
