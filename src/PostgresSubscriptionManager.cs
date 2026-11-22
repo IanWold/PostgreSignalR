@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.SignalR;
 
 namespace PostgreSignalR;
@@ -33,6 +34,13 @@ internal sealed class PostgresSubscriptionManager
             _lock.Release();
         }
     }
+
+    /// <summary>
+    /// Gets the local connections subscribed under an id, if there are any. Safe to call without the lock:
+    /// <see cref="HubConnectionStore"/> can be read while connections are added and removed.
+    /// </summary>
+    public bool TryGetConnections(string id, [NotNullWhen(true)] out HubConnectionStore? connections) =>
+        _subscriptions.TryGetValue(id, out connections) && connections.Count > 0;
 
     public async Task RemoveSubscriptionAsync(string id, HubConnectionContext connection, object state, Func<object, string, Task> unsubscribeMethod)
     {

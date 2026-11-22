@@ -2,9 +2,10 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
+public abstract class GroupTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task Group_RemovalStopsDelivery()
     {
         await using var member1 = await Server1.CreateClientAsync();
@@ -21,6 +22,77 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Equal(ShortMessage, (await messageFromMember1).Arg<string>());
 
         await member2.EnsureNoMessageAsync(nameof(IClient.Message));
+    }
+
+    [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
+    public async Task Group_RepeatedJoinAndLeaveKeepsDeliveryCorrect()
+    {
+        await using var member = await Server1.CreateClientAsync();
+        await using var sender = await Server2.CreateClientAsync();
+
+        for (var i = 0; i < 5; i++)
+        {
+            await member.Send.JoinGroup(GroupName);
+            await member.Send.LeaveGroup(GroupName);
+        }
+
+        await member.Send.JoinGroup(GroupName);
+
+        var messageToMember = member.ExpectMessageAsync(nameof(IClient.Message));
+
+        await sender.Send.SendToAllInGroup(GroupName, ShortMessage);
+
+        Assert.Equal(ShortMessage, (await messageToMember).Arg<string>());
+
+        await member.Send.LeaveGroup(GroupName);
+        await sender.Send.SendToAllInGroup(GroupName, ShortMessage);
+
+        await member.EnsureNoMessageAsync(nameof(IClient.Message));
+    }
+
+    [RetryFact]
+    public async Task Groups_ConnectionInTwoTargetedGroupsReceivesOneCopyPerGroup()
+    {
+        await using var sender = await Server1.CreateClientAsync();
+        await using var member = await Server2.CreateClientAsync();
+
+        var group1 = GroupName;
+        var group2 = Guid.NewGuid().ToString();
+
+        await member.Send.JoinGroup(group1);
+        await member.Send.JoinGroup(group2);
+
+        var firstCopy = member.ExpectMessageAsync(nameof(IClient.Message));
+        var secondCopy = member.ExpectMessageAsync(nameof(IClient.Message));
+
+        await sender.Send.SendToAllInGroups([group1, group2], ShortMessage);
+
+        Assert.Equal(ShortMessage, (await firstCopy).Arg<string>());
+        Assert.Equal(ShortMessage, (await secondCopy).Arg<string>());
+
+        await member.EnsureNoMessageAsync(nameof(IClient.Message));
+    }
+
+    [RetryFact]
+    public async Task Group_NamesAreCaseSensitive()
+    {
+        await using var sender = await Server1.CreateClientAsync();
+        await using var member = await Server2.CreateClientAsync();
+
+        var groupName = $"Group-{GroupName}";
+
+        await member.Send.JoinGroup(groupName);
+
+        await sender.Send.SendToAllInGroup(groupName.ToLowerInvariant(), ShortMessage);
+
+        await member.EnsureNoMessageAsync(nameof(IClient.Message));
+
+        var messageToMember = member.ExpectMessageAsync(nameof(IClient.Message));
+
+        await sender.Send.SendToAllInGroup(groupName, ShortMessage);
+
+        Assert.Equal(ShortMessage, (await messageToMember).Arg<string>());
     }
 
     [RetryFact]
@@ -95,3 +167,7 @@ public class GroupTests(ContainerFixture fixture) : BaseTest(fixture)
         await excluded.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }
+
+public sealed class PerTargetGroupTests(ContainerFixture fixture) : GroupTests(fixture, BackplaneTestConfiguration.Default);
+
+public sealed class SharedGroupTests(ContainerFixture fixture) : GroupTests(fixture, BackplaneTestConfiguration.Shared);

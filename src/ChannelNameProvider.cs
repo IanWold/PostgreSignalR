@@ -8,12 +8,30 @@ namespace PostgreSignalR;
 
 internal abstract class ChannelNameProvider
 {
-    public ChannelNameProvider(string returnServerName)
+    /// <param name="returnServerName">The name of this server, used for its return results channel.</param>
+    /// <param name="hubScope">
+    /// When set, scopes the channels shared between servers (<see cref="All"/>, <see cref="GroupManagement"/> and <see cref="Shared"/>)
+    /// to one hub, so hubs on the same backplane don't receive each other's messages. See <see cref="GetHubScope"/>.
+    /// </param>
+    public ChannelNameProvider(string returnServerName, string? hubScope = null)
     {
-        All = Normalize("all");
-        GroupManagement = Normalize("grp_mgm");
+        var scope = hubScope is null ? string.Empty : $"{hubScope}_";
+
+        All = Normalize($"{scope}all");
+        GroupManagement = Normalize($"{scope}grp_mgm");
+        Shared = Normalize($"{scope}shared");
         ReturnResults = Normalize($"ret_{returnServerName}");
     }
+
+    /// <summary>
+    /// Gets a short, stable identifier for a hub type, for use as a hub scope.
+    /// </summary>
+    /// <remarks>
+    /// Uses <see cref="Type.ToString"/> rather than <see cref="Type.FullName"/> because the full name of a generic type
+    /// includes assembly versions, which could differ between servers.
+    /// </remarks>
+    public static string GetHubScope(Type hubType) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(hubType.ToString())))[..8].ToLowerInvariant();
 
     /// <summary>
     /// Postgres limits channel names to identifiers up to 63 characters.
@@ -41,6 +59,11 @@ internal abstract class ChannelNameProvider
     /// Gets the name of the internal channel for receiving client results.
     /// </summary>
     public string ReturnResults { get; }
+
+    /// <summary>
+    /// Gets the name of the channel that carries every connection, user and group send under <see cref="ChannelRouting.Shared"/>.
+    /// </summary>
+    public string Shared { get; }
 
     /// <summary>
     /// Gets the name of the channel for sending a message to a specific connection.
@@ -71,7 +94,7 @@ internal abstract class ChannelNameProvider
     public string Ack(string serverName) => Normalize($"ack_{serverName}");
 }
 
-internal sealed class TruncatingChannelNameProvider(string prefix, string returnServerName) : ChannelNameProvider(returnServerName)
+internal sealed class TruncatingChannelNameProvider(string prefix, string returnServerName, string? hubScope = null) : ChannelNameProvider(returnServerName, hubScope)
 {
     internal override string Normalize(string name)
     {
@@ -90,7 +113,7 @@ internal sealed class TruncatingChannelNameProvider(string prefix, string return
     }
 }
 
-internal sealed class HashingChannelNameProvider(string prefix, string returnServerName) : ChannelNameProvider(returnServerName)
+internal sealed class HashingChannelNameProvider(string prefix, string returnServerName, string? hubScope = null) : ChannelNameProvider(returnServerName, hubScope)
 {
     // Below this many UTF-8 bytes we encode on the stack;
     // names larger than this are rented from the array pool to never risk overflowing a fixed-size stack buffer

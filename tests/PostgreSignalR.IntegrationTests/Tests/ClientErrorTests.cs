@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class ClientErrorTests(ContainerFixture fixture) : BaseTest(fixture)
+public abstract class ClientErrorTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
     public async Task InvokeConnection_CalleeThrowsSameServer()
@@ -49,3 +49,7 @@ public class ClientErrorTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Contains("disconnected", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 }
+
+public sealed class PerTargetClientErrorTests(ContainerFixture fixture) : ClientErrorTests(fixture, BackplaneTestConfiguration.Default);
+
+public sealed class SharedClientErrorTests(ContainerFixture fixture) : ClientErrorTests(fixture, BackplaneTestConfiguration.Shared);

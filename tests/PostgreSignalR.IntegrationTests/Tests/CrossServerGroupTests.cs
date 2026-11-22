@@ -2,9 +2,10 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class CrossServerGroupTests(ContainerFixture fixture) : BaseTest(fixture)
+public abstract class CrossServerGroupTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task AddConnectionToGroupFromAnotherServerDeliversGroupMessages()
     {
         await using var member = await Server2.CreateClientAsync();
@@ -25,6 +26,7 @@ public class CrossServerGroupTests(ContainerFixture fixture) : BaseTest(fixture)
     }
 
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task RemoveConnectionFromGroupFromAnotherServerStopsDelivery()
     {
         await using var member = await Server2.CreateClientAsync();
@@ -45,3 +47,7 @@ public class CrossServerGroupTests(ContainerFixture fixture) : BaseTest(fixture)
         await member.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }
+
+public sealed class PerTargetCrossServerGroupTests(ContainerFixture fixture) : CrossServerGroupTests(fixture, BackplaneTestConfiguration.Default);
+
+public sealed class SharedCrossServerGroupTests(ContainerFixture fixture) : CrossServerGroupTests(fixture, BackplaneTestConfiguration.Shared);

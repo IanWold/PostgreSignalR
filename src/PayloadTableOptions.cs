@@ -6,13 +6,16 @@ namespace PostgreSignalR;
 public enum PayloadTableStorage
 {
     /// <summary>
-    /// If the payload is less than 8000 bytes, sends directly in the notification event payload.
-    /// Otherwise, stores paylaods in the payload table and sends as references in the notification event payload.
+    /// If the payload fits in the notification event payload, sends it there directly.
+    /// Otherwise, stores payloads in the payload table and sends as references in the notification event payload.
     /// </summary>
+    /// <remarks>
+    /// Postgres limits notification payloads to less than 8000 bytes, so after base64 encoding, messages of up to 5997 bytes are sent directly.
+    /// </remarks>
     Auto,
 
     /// <summary>
-    /// Always stores paylaods in the payload table and sends as references in the notification event payload.
+    /// Always stores payloads in the payload table and sends as references in the notification event payload.
     /// </summary>
     Always
 }
@@ -26,12 +29,12 @@ public class PayloadTableOptions
     /// Configures how the table is used to store payloads.
     /// Possible values:
     /// <list type="bullet">
-    ///     <item><see cref="PayloadTableStorage.Auto"/>: Uses the event payload if the payload is less than 6000 bytes, otherwise uses a table to store payloads</item>
+    ///     <item><see cref="PayloadTableStorage.Auto"/>: Uses the event payload if the payload fits (messages up to 5997 bytes), otherwise uses a table to store payloads</item>
     ///     <item><see cref="PayloadTableStorage.Always"/>: Always uses a table to store payloads</item>
     /// </list>
     /// Default: <see cref="PayloadTableStorage.Auto"/>
     /// </summary>
-    public PayloadTableStorage StorageMode = PayloadTableStorage.Auto;
+    public PayloadTableStorage StorageMode { get; set; } = PayloadTableStorage.Auto;
 
     /// <summary>
     /// The name of the schema containing the table.

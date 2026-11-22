@@ -13,7 +13,7 @@ namespace PostgreSignalR;
 
 file class PostgresFeature
 {
-    public HashSet<string> Groups { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> Groups { get; } = [with(StringComparer.OrdinalIgnoreCase)];
 }
 
 file class FakeInvocationBinder : IInvocationBinder
@@ -45,6 +45,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
     private readonly ClientResultsManager _clientResultsManager = new();
     private readonly PostgresListener _postgresListener;
     private readonly IPayloadStrategy _payloadStrategy;
+    private readonly IPrefixedPayloadStrategy? _prefixedPayloadStrategy;
     private int _internalAckId;
     private bool _isInitialized;
 
@@ -73,10 +74,14 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
             ? string.Empty
             : $"{_options.Prefix.TrimEnd("_")}_";
 
+        var hubScope = _options.ChannelRouting == ChannelRouting.Shared
+            ? ChannelNameProvider.GetHubScope(typeof(THub))
+            : null;
+
         _channels = _options.ChannelNameNormaization switch
         {
-            ChannelNameNormaization.Truncate => new TruncatingChannelNameProvider(prefix, _serverName),
-            ChannelNameNormaization.HashAlways or _ => new HashingChannelNameProvider(prefix, _serverName)
+            ChannelNameNormaization.Truncate => new TruncatingChannelNameProvider(prefix, _serverName, hubScope),
+            ChannelNameNormaization.HashAlways or _ => new HashingChannelNameProvider(prefix, _serverName, hubScope)
         };
 
         if (globalHubOptions != null && hubOptions != null)
@@ -90,10 +95,21 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         }
 
         _payloadStrategy = payloadStrategy;
+        _prefixedPayloadStrategy = payloadStrategy as IPrefixedPayloadStrategy;
 
         _postgresListener = new(options.Value.DataSource, logger);
         _postgresListener.OnNotification += OnNotification;
     }
+
+    /// <summary>
+    /// The number of channels this hub's listener connection is subscribed to. For diagnostics and tests.
+    /// </summary>
+    internal int ListenerChannelCount => _postgresListener.ChannelCount;
+
+    /// <summary>
+    /// The number of LISTEN statements this hub's listener connection has run. For diagnostics and tests.
+    /// </summary>
+    internal long ListenerListenCount => _postgresListener.ListenCount;
 
     private async Task EnsureInitializedAsync()
     {
@@ -117,12 +133,20 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
             {
                 await _postgresListener.EnsureReadyAsync();
 
-                await Task.WhenAll([
+                var subscriptions = new List<Task>
+                {
                     SubscribeToAll(),
                     SubscribeToGroupManagementChannel(),
                     SubscribeToAckChannel(),
                     SubscribeToReturnResultsAsync()
-                ]);
+                };
+
+                if (_options.ChannelRouting == ChannelRouting.Shared)
+                {
+                    subscriptions.Add(SubscribeToSharedChannelAsync());
+                }
+
+                await Task.WhenAll(subscriptions);
 
                 _isInitialized = true;
 
@@ -155,9 +179,19 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         var feature = new PostgresFeature();
         connection.Features.Set(feature);
 
-        var userTask = Task.CompletedTask;
-
         _connections.Add(connection);
+
+        if (_options.ChannelRouting == ChannelRouting.Shared)
+        {
+            if (!string.IsNullOrEmpty(connection.UserIdentifier))
+            {
+                await _users.AddSubscriptionAsync(connection.UserIdentifier, connection, (_, _) => Task.CompletedTask);
+            }
+
+            return;
+        }
+
+        var userTask = Task.CompletedTask;
 
         var connectionTask = SubscribeToConnection(connection);
 
@@ -176,12 +210,13 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
 
         _connections.Remove(connection);
 
-        _logger.BackplaneUnsubscribingConnection(connection.ConnectionId);
+        var tasks = new List<Task>();
 
-        var tasks = new List<Task>
+        if (_options.ChannelRouting != ChannelRouting.Shared)
         {
-            UnsubscribeAsync(_channels.Connection(connection.ConnectionId))
-        };
+            _logger.BackplaneUnsubscribingConnection(connection.ConnectionId);
+            tasks.Add(UnsubscribeAsync(_channels.Connection(connection.ConnectionId)));
+        }
 
         var feature = connection.Features.GetRequiredFeature<PostgresFeature>();
         var groupNames = feature.Groups;
@@ -241,7 +276,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         }
 
         var message = _protocol.WriteInvocation(methodName, args);
-        await PublishAsync(_channels.Connection(connectionId), message);
+        await PublishToTargetAsync(RoutingTarget.Connection, connectionId, message);
     }
 
     /// <inheritdoc />
@@ -252,7 +287,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         ArgumentNullException.ThrowIfNull(groupName);
 
         var message = _protocol.WriteInvocation(methodName, args);
-        await PublishAsync(_channels.Group(groupName), message);
+        await PublishToTargetAsync(RoutingTarget.Group, groupName, message);
     }
 
     /// <inheritdoc />
@@ -263,7 +298,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         ArgumentNullException.ThrowIfNull(groupName);
 
         var message = _protocol.WriteInvocation(methodName, args, excludedConnectionIds: excludedConnectionIds);
-        await PublishAsync(_channels.Group(groupName), message);
+        await PublishToTargetAsync(RoutingTarget.Group, groupName, message);
     }
 
     /// <inheritdoc />
@@ -272,7 +307,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         await EnsureInitializedAsync();
 
         var message = _protocol.WriteInvocation(methodName, args);
-        await PublishAsync(_channels.User(userId), message);
+        await PublishToTargetAsync(RoutingTarget.User, userId, message);
     }
 
     /// <inheritdoc />
@@ -325,7 +360,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
 
         foreach (var connectionId in connectionIds)
         {
-            publishTasks.Add(PublishAsync(_channels.Connection(connectionId), payload));
+            publishTasks.Add(PublishToTargetAsync(RoutingTarget.Connection, connectionId, payload));
         }
 
         await Task.WhenAll(publishTasks);
@@ -344,7 +379,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         {
             if (!string.IsNullOrEmpty(groupName))
             {
-                publishTasks.Add(PublishAsync(_channels.Group(groupName), payload));
+                publishTasks.Add(PublishToTargetAsync(RoutingTarget.Group, groupName, payload));
             }
         }
 
@@ -364,7 +399,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
             {
                 if (!string.IsNullOrEmpty(userId))
                 {
-                    publishTasks.Add(PublishAsync(_channels.User(userId), payload));
+                    publishTasks.Add(PublishToTargetAsync(RoutingTarget.User, userId, payload));
                 }
             }
 
@@ -373,14 +408,44 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         }
     }
 
-    private async Task PublishAsync(string channel, byte[] message)
+    private Task PublishToTargetAsync(RoutingTarget target, string id, byte[] message)
+    {
+        if (_options.ChannelRouting != ChannelRouting.Shared)
+        {
+            var channel = target switch
+            {
+                RoutingTarget.Connection => _channels.Connection(id),
+                RoutingTarget.Group => _channels.Group(id),
+                RoutingTarget.User => _channels.User(id),
+                _ => throw new ArgumentOutOfRangeException(nameof(target))
+            };
+
+            return PublishAsync(channel, message);
+        }
+
+        if (_prefixedPayloadStrategy is not null)
+        {
+            return PublishAsync(_channels.Shared, message, PostgresProtocol.WriteRoutingHeader(target, id));
+        }
+
+        return PublishAsync(_channels.Shared, PostgresProtocol.WriteRoutedMessage(target, id, message));
+    }
+
+    private async Task PublishAsync(string channel, byte[] message, string? routingHeader = null)
     {
         _logger.BackplanePublishing(channel);
 
         await _commandLock.WaitAsync();
         try
         {
-            await _payloadStrategy.NotifyAsync(channel, message);
+            if (routingHeader is null)
+            {
+                await _payloadStrategy.NotifyAsync(channel, message);
+            }
+            else
+            {
+                await _prefixedPayloadStrategy!.NotifyAsync(channel, routingHeader, message);
+            }
         }
         catch (Exception ex)
         {
@@ -407,6 +472,11 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
             }
         }
 
+        if (_options.ChannelRouting == ChannelRouting.Shared)
+        {
+            return _groups.AddSubscriptionAsync(groupName, connection, (_, _) => Task.CompletedTask);
+        }
+
         var groupChannel = _channels.Group(groupName);
         return _groups.AddSubscriptionAsync(groupChannel, connection, SubscribeToGroupAsync);
     }
@@ -417,14 +487,21 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
     /// </summary>
     private async Task RemoveGroupAsyncCore(HubConnectionContext connection, string groupName)
     {
-        var groupChannel = _channels.Group(groupName);
-
-        await _groups.RemoveSubscriptionAsync(groupChannel, connection, this, (state, channelName) =>
+        if (_options.ChannelRouting == ChannelRouting.Shared)
         {
-            var lifetimeManager = (PostgresHubLifetimeManager<THub>)state;
-            lifetimeManager._logger.BackplaneUnsubscribingGroupChannel(groupChannel, channelName);
-            return lifetimeManager.UnsubscribeAsync(channelName);
-        });
+            await _groups.RemoveSubscriptionAsync(groupName, connection, this, (_, _) => Task.CompletedTask);
+        }
+        else
+        {
+            var groupChannel = _channels.Group(groupName);
+
+            await _groups.RemoveSubscriptionAsync(groupChannel, connection, this, (state, channelName) =>
+            {
+                var lifetimeManager = (PostgresHubLifetimeManager<THub>)state;
+                lifetimeManager._logger.BackplaneUnsubscribingGroupChannel(groupChannel, channelName);
+                return lifetimeManager.UnsubscribeAsync(channelName);
+            });
+        }
 
         var feature = connection.Features.GetRequiredFeature<PostgresFeature>();
         var groupNames = feature.Groups;
@@ -450,6 +527,11 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
 
     private Task RemoveUserAsync(HubConnectionContext connection)
     {
+        if (_options.ChannelRouting == ChannelRouting.Shared)
+        {
+            return _users.RemoveSubscriptionAsync(connection.UserIdentifier!, connection, this, (_, _) => Task.CompletedTask);
+        }
+
         var userChannel = _channels.User(connection.UserIdentifier!);
 
         return _users.RemoveSubscriptionAsync(userChannel, connection, this, (state, channelName) =>
@@ -508,7 +590,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
             {
                 // TODO: Need to handle other server going away while waiting for connection result
                 var messageBytes = _protocol.WriteInvocation(methodName, args, invocationId, returnChannel: _channels.ReturnResults);
-                await PublishAsync(_channels.Connection(connectionId), messageBytes);
+                await PublishToTargetAsync(RoutingTarget.Connection, connectionId, messageBytes);
             }
             else
             {
@@ -562,17 +644,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
 
             var invocation = PostgresProtocol.ReadInvocation(message);
 
-            var tasks = new List<Task>(_connections.Count);
-
-            foreach (var connection in _connections)
-            {
-                if (invocation.ExcludedConnectionIds == null || !invocation.ExcludedConnectionIds.Contains(connection.ConnectionId))
-                {
-                    tasks.Add(connection.WriteAsync(invocation.Message).AsTask());
-                }
-            }
-
-            await Task.WhenAll(tasks);
+            await WriteToConnectionsAsync(_connections, invocation);
         }
         catch (Exception ex)
         {
@@ -618,8 +690,58 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
 
     private async Task SubscribeToConnection(HubConnectionContext connection) => await SubscribeAsync(_channels.Connection(connection.ConnectionId), async message =>
     {
-        var invocation = PostgresProtocol.ReadInvocation(message);
+        try
+        {
+            await WriteToConnectionAsync(connection, PostgresProtocol.ReadInvocation(message));
+        }
+        catch (Exception ex)
+        {
+            _logger.BackplaneFailedWritingMessage(ex);
+        }
+    });
 
+    private Task SubscribeToUser(HubConnectionContext connection)
+    {
+        var userChannel = _channels.User(connection.UserIdentifier!);
+
+        return _users.AddSubscriptionAsync(userChannel, connection, async (channelName, subscriptions) =>
+        {
+            _logger.BackplaneSubscribingUserChannel(userChannel, channelName);
+            await SubscribeAsync(channelName, async message =>
+            {
+                try
+                {
+                    await WriteToConnectionsAsync(subscriptions, PostgresProtocol.ReadInvocation(message));
+                }
+                catch (Exception ex)
+                {
+                    _logger.BackplaneFailedWritingMessage(ex);
+                }
+            });
+        });
+    }
+
+    private async Task SubscribeToGroupAsync(string groupChannel, HubConnectionStore groupConnections) => await SubscribeAsync(groupChannel, async message =>
+    {
+        try
+        {
+            await WriteToConnectionsAsync(groupConnections, PostgresProtocol.ReadInvocation(message));
+        }
+        catch (Exception ex)
+        {
+            _logger.BackplaneFailedWritingMessage(ex);
+        }
+    });
+
+    private async Task SubscribeToSharedChannelAsync()
+    {
+        // Notifications on the shared channel are handled by OnSharedNotification,
+        // because they must be routed before the payload is resolved, so this doesn't register a handler.
+        await _postgresListener.SubscribeAsync(_channels.Shared);
+    }
+
+    private async Task WriteToConnectionAsync(HubConnectionContext connection, PostgresInvocation invocation)
+    {
         // This is a Client result we need to setup state for the completion and forward the message to the client
         if (!string.IsNullOrEmpty(invocation.InvocationId))
         {
@@ -635,7 +757,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
                 {
                     connection.Protocol.WriteMessage(completionMessage, memoryBufferWriter);
                     message = PostgresProtocol.WriteCompletionMessage(memoryBufferWriter, protocolName);
-                    
+
                     await PublishAsync(invocation.ReturnChannel!, message);
                 }
                 catch (Exception ex)
@@ -656,61 +778,24 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
         // Forward message from other server to client
         // Normal client method invokes and client result invokes use the same message
         await connection.WriteAsync(invocation.Message);
-    });
-
-    private Task SubscribeToUser(HubConnectionContext connection)
-    {
-        var userChannel = _channels.User(connection.UserIdentifier!);
-
-        return _users.AddSubscriptionAsync(userChannel, connection, async (channelName, subscriptions) =>
-        {
-            _logger.BackplaneSubscribingUserChannel(userChannel, channelName);
-            await SubscribeAsync(channelName, async message =>
-            {
-                try
-                {
-                    var invocation = PostgresProtocol.ReadInvocation(message);
-
-                    var tasks = new List<Task>(subscriptions.Count);
-                    foreach (var userConnection in subscriptions)
-                    {
-                        tasks.Add(userConnection.WriteAsync(invocation.Message).AsTask());
-                    }
-
-                    await Task.WhenAll(tasks);
-                }
-                catch (Exception ex)
-                {
-                    _logger.BackplaneFailedWritingMessage(ex);
-                }
-            });
-        });
     }
 
-    private async Task SubscribeToGroupAsync(string groupChannel, HubConnectionStore groupConnections) => await SubscribeAsync(groupChannel, async message =>
+    private static Task WriteToConnectionsAsync(HubConnectionStore connections, PostgresInvocation invocation)
     {
-        try
+        var tasks = new List<Task>(connections.Count);
+
+        foreach (var connection in connections)
         {
-            var invocation = PostgresProtocol.ReadInvocation(message);
-
-            var tasks = new List<Task>(groupConnections.Count);
-            foreach (var groupConnection in groupConnections)
+            if (invocation.ExcludedConnectionIds?.Contains(connection.ConnectionId) == true)
             {
-                if (invocation.ExcludedConnectionIds?.Contains(groupConnection.ConnectionId) == true)
-                {
-                    continue;
-                }
-
-                tasks.Add(groupConnection.WriteAsync(invocation.Message).AsTask());
+                continue;
             }
 
-            await Task.WhenAll(tasks);
+            tasks.Add(connection.WriteAsync(invocation.Message).AsTask());
         }
-        catch (Exception ex)
-        {
-            _logger.BackplaneFailedWritingMessage(ex);
-        }
-    });
+
+        return Task.WhenAll(tasks);
+    }
 
     private async Task SubscribeToReturnResultsAsync() => await SubscribeAsync(_channels.ReturnResults, message =>
     {
@@ -793,7 +878,16 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
 
     private void OnNotification(object? sender, NpgsqlNotificationEventArgs e)
     {
+        // Exceptions must not escape: this runs inside the listener's wait for notifications, and an exception there makes the listener reconnect.
+
         _logger.BackplaneReadNotification(e.Channel);
+
+        if (_options.ChannelRouting == ChannelRouting.Shared && string.Equals(e.Channel, _channels.Shared, StringComparison.Ordinal))
+        {
+            OnSharedNotification(e);
+            return;
+        }
+
         if (_notificationHandlers.TryGetValue(e.Channel, out var handler))
         {
             byte[] payload;
@@ -807,7 +901,106 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
                 return;
             }
 
-            handler(payload);
+            try
+            {
+                handler(payload);
+            }
+            catch (Exception ex)
+            {
+                _logger.BackplaneFailedHandlingNotification(e.Channel, ex);
+            }
+        }
+    }
+
+    private void OnSharedNotification(NpgsqlNotificationEventArgs e)
+    {
+        RoutingHeader header;
+        ReadOnlyMemory<byte> message;
+
+        try
+        {
+            if (_prefixedPayloadStrategy is not null)
+            {
+                var payloadStart = PostgresProtocol.ReadRoutingHeader(e.Payload, out header);
+
+                if (!HasLocalTarget(header))
+                {
+                    _logger.BackplaneSkippedSharedMessage(header.RoutingTarget.ToString());
+                    return;
+                }
+
+                message = _prefixedPayloadStrategy.ResolveNotificationPayload(e.Payload[payloadStart..]);
+            }
+            else
+            {
+                message = PostgresProtocol.ReadRoutedMessage(_payloadStrategy.ResolveNotificationPayload(e), out header);
+
+                if (!HasLocalTarget(header))
+                {
+                    _logger.BackplaneSkippedSharedMessage(header.RoutingTarget.ToString());
+                    return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.BackplaneFailedResolvingPayload(e.Channel, ex);
+            return;
+        }
+
+        _ = DeliverSharedMessageAsync(header, message);
+    }
+
+    private bool HasLocalTarget(RoutingHeader header)
+    {
+        foreach (var id in header.Ids)
+        {
+            var isLocal = header.RoutingTarget switch
+            {
+                RoutingTarget.Connection => _connections[id] is not null,
+                RoutingTarget.User => _users.TryGetConnections(id, out _),
+                RoutingTarget.Group => _groups.TryGetConnections(id, out _),
+                _ => false
+            };
+
+            if (isLocal)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task DeliverSharedMessageAsync(RoutingHeader header, ReadOnlyMemory<byte> message)
+    {
+        try
+        {
+            _logger.BackplaneReceivedMessage(_channels.Shared);
+
+            var invocation = PostgresProtocol.ReadInvocation(message);
+
+            foreach (var id in header.Ids)
+            {
+                switch (header.RoutingTarget)
+                {
+                    case RoutingTarget.Connection when _connections[id] is { } connection:
+                        await WriteToConnectionAsync(connection, invocation);
+                        break;
+
+                    case RoutingTarget.User when _users.TryGetConnections(id, out var userConnections):
+                        await WriteToConnectionsAsync(userConnections, invocation);
+                        break;
+
+                    case RoutingTarget.Group when _groups.TryGetConnections(id, out var groupConnections):
+                        await WriteToConnectionsAsync(groupConnections, invocation);
+                        break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.BackplaneFailedWritingMessage(ex);
         }
     }
 

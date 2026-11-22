@@ -3,6 +3,10 @@ name: Build
 on:
   pull_request:
     branches: [ "main" ]
+  schedule:
+    # Weekly, to run the full suite on every supported Postgres version
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,17 +33,43 @@ jobs:
       run: dotnet pack src/PostgreSignalR.csproj --no-build -c Debug
     - name: Test
       run: dotnet test --project tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj -f ${{ matrix.tfm }} --no-build --output Detailed --hangdump --hangdump-timeout 2m --hangdump-type Mini --stop-on-fail on
-      timeout-minutes: 10
+      timeout-minutes: 25
+
+  # PostgreSignalR supports the PostgreSQL versions supported by the PostgreSQL Global Development Group.
+  # The build job runs the full suite on Postgres 16. On pull requests, this runs the tests of behavior that could
+  # change between Postgres versions on the others; on the weekly and manual runs, it runs the full suite.
+  postgres:
+    runs-on: ubuntu-latest
+    name: Postgres ${{ matrix.postgres }}
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: [15, 17, 18, 19]
+    env:
+      POSTGRES_IMAGE: postgres:${{ matrix.postgres }}
+    steps:
+    - uses: actions/checkout@v7
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 11.0.x
+    - name: Restore dependencies
+      run: dotnet restore tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj
+    - name: Build
+      run: dotnet build tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj --no-restore
+    - name: Test
+      run: dotnet test --project tests/PostgreSignalR.IntegrationTests/PostgreSignalR.IntegrationTests.csproj -f net11.0 --no-build --output Detailed --hangdump --hangdump-timeout 2m --hangdump-type Mini --stop-on-fail on ${{ github.event_name == 'pull_request' && '--filter-trait "Category=PostgresCompat"' || '' }}
+      timeout-minutes: 25
 
   build-status:
     name: Build
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, postgres]
     if: always()
     steps:
-      - name: Fail if any TFM job did not succeed
+      - name: Fail if any job did not succeed
         run: |
-          if [ "${{ needs.build.result }}" != "success" ]; then
-            echo "One or more TFM jobs did not succeed (result: ${{ needs.build.result }})."
+          if [ "${{ needs.build.result }}" != "success" ] || [ "${{ needs.postgres.result }}" != "success" ]; then
+            echo "One or more jobs did not succeed (build: ${{ needs.build.result }}, postgres: ${{ needs.postgres.result }})."
             exit 1
           fi

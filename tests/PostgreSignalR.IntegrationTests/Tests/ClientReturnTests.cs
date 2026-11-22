@@ -1,8 +1,9 @@
 namespace PostgreSignalR.IntegrationTests;
 
-public class ClientReturnTests(ContainerFixture fixture) : BaseTest(fixture)
+public abstract class ClientReturnTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task Invoke_ReturnsAcrossServers()
     {
         await using var caller = await Server1.CreateClientAsync();
@@ -28,3 +29,7 @@ public class ClientReturnTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Equal($"echo:{ShortMessage}", result);
     }
 }
+
+public sealed class PerTargetClientReturnTests(ContainerFixture fixture) : ClientReturnTests(fixture, BackplaneTestConfiguration.Default);
+
+public sealed class SharedClientReturnTests(ContainerFixture fixture) : ClientReturnTests(fixture, BackplaneTestConfiguration.Shared);

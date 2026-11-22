@@ -11,7 +11,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 public class ContainerFixture : IAsyncLifetime
 {
-    private readonly ConcurrentDictionary<BackplaneTestConfiguration, Task<ConfiguredServerPair>> _configuredServerPairs = new();
+    private readonly ConcurrentDictionary<(BackplaneTestConfiguration Server1, BackplaneTestConfiguration Server2), Task<ConfiguredServerPair>> _configuredServerPairs = new();
     private readonly ConcurrentDictionary<BackplaneTestConfiguration, Task<ConfiguredSingleServer>> _configuredSingleServers = new();
 
     public INetwork? Network { get; set; }
@@ -55,11 +55,14 @@ public class ContainerFixture : IAsyncLifetime
     public Task<(TestServer Server1, TestServer Server2)> GetServerPairAsync(BackplaneTestConfiguration configuration) =>
         configuration == BackplaneTestConfiguration.Default
             ? Task.FromResult((SharedServer1!, SharedServer2!))
-            : GetOrCreateConfiguredPairAsync(configuration);
+            : GetServerPairAsync(configuration, configuration);
 
-    private async Task<(TestServer, TestServer)> GetOrCreateConfiguredPairAsync(BackplaneTestConfiguration configuration)
+    /// <summary>
+    /// Gets a pair of servers on one database, each with its own configuration.
+    /// </summary>
+    public async Task<(TestServer Server1, TestServer Server2)> GetServerPairAsync(BackplaneTestConfiguration server1Configuration, BackplaneTestConfiguration server2Configuration)
     {
-        var pair = await _configuredServerPairs.GetOrAdd(configuration, CreateConfiguredServerPairAsync);
+        var pair = await _configuredServerPairs.GetOrAdd((server1Configuration, server2Configuration), CreateConfiguredServerPairAsync);
         return (pair.Server1, pair.Server2);
     }
 
@@ -70,17 +73,16 @@ public class ContainerFixture : IAsyncLifetime
             return SharedDatabse!.ConnectionString;
         }
 
-        var pair = await _configuredServerPairs.GetOrAdd(configuration, CreateConfiguredServerPairAsync);
+        var pair = await _configuredServerPairs.GetOrAdd((configuration, configuration), CreateConfiguredServerPairAsync);
         return pair.Database.ConnectionString;
     }
 
-    private async Task<ConfiguredServerPair> CreateConfiguredServerPairAsync(BackplaneTestConfiguration configuration)
+    private async Task<ConfiguredServerPair> CreateConfiguredServerPairAsync((BackplaneTestConfiguration Server1, BackplaneTestConfiguration Server2) configurations)
     {
         var database = await GetDatabaseAsync();
-        var environment = configuration.ToEnvironmentVariables();
 
-        var server1 = new TestServer(await CreateTestServerAsync(database, environment));
-        var server2 = new TestServer(await CreateTestServerAsync(database, environment));
+        var server1 = new TestServer(await CreateTestServerAsync(database, configurations.Server1.ToEnvironmentVariables()));
+        var server2 = new TestServer(await CreateTestServerAsync(database, configurations.Server2.ToEnvironmentVariables()));
 
         return new ConfiguredServerPair(database, server1, server2);
     }
@@ -101,6 +103,11 @@ public class ContainerFixture : IAsyncLifetime
         return new ConfiguredSingleServer(database, server);
     }
 
+    /// <summary>
+    /// The Postgres image to test against. Set the <c>POSTGRES_IMAGE</c> environment variable to test another version.
+    /// </summary>
+    public static string PostgresImage { get; } = Environment.GetEnvironmentVariable("POSTGRES_IMAGE") is { Length: > 0 } image ? image : "postgres:16";
+
     public async ValueTask InitializeAsync()
     {
         Network = new NetworkBuilder()
@@ -120,7 +127,7 @@ public class ContainerFixture : IAsyncLifetime
 
         await TestServerImage.CreateAsync();
 
-        PostgresContainer = new PostgreSqlBuilder("postgres:16")
+        PostgresContainer = new PostgreSqlBuilder(PostgresImage)
             .WithUsername("postgres")
             .WithPassword("admin")
             .WithNetwork(Network)

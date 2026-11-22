@@ -21,6 +21,24 @@ public enum ChannelNameNormaization
 }
 
 /// <summary>
+/// How the backplane maps connection, user and group sends onto Postgres channels.
+/// </summary>
+public enum ChannelRouting
+{
+    /// <summary>
+    /// A channel per connection, user and group. Each server LISTENs on the channels
+    /// of its local targets.
+    /// </summary>
+    PerTarget,
+
+    /// <summary>
+    /// One shared channel for every connection, user and group send. Each server LISTENs
+    /// on a fixed set of channels and delivers to its own local targets from in-memory state.
+    /// </summary>
+    Shared
+}
+
+/// <summary>
 /// Handler for <see cref="PostgresBackplaneOptions.OnInitialized"/>
 /// </summary>
 public delegate void OnInitializedHandler();
@@ -49,6 +67,21 @@ public class PostgresBackplaneOptions
     /// Default: <see cref="ChannelNameNormaization.Truncate"/>
     /// </summary>
     public ChannelNameNormaization ChannelNameNormaization { get; set; } = ChannelNameNormaization.Truncate;
+
+    /// <summary>
+    /// Configures how connection, user and group sends are routed between servers.
+    /// Possible values:
+    /// <list type="bullet">
+    ///     <item><see cref="ChannelRouting.PerTarget"/>: A channel per connection, user and group. Each server receives only the messages for its own targets.</item>
+    ///     <item><see cref="ChannelRouting.Shared"/>: One shared channel. Each server LISTENs on a fixed set of channels, and connecting or joining a group never touches Postgres.</item>
+    /// </list>
+    /// Default: <see cref="ChannelRouting.PerTarget"/>
+    /// </summary>
+    /// <remarks>
+    /// Servers using different routing don't exchange messages, so every server sharing a <see cref="Prefix"/> must use the same value.
+    /// With <see cref="ChannelRouting.Shared"/>, each hub's channels are also kept separate from other hubs'.
+    /// </remarks>
+    public ChannelRouting ChannelRouting { get; set; } = ChannelRouting.PerTarget;
 
     /// <summary>
     /// Configures the <see href="https://www.npgsql.org/doc/api/Npgsql.NpgsqlDataSource.html">NpgsqlDataSource</see> to connect to the Postgres database.
@@ -82,6 +115,10 @@ public class PostgresBackplaneOptions
         else if (DataSource is null)
         {
             message = "DataSource must be configured.";
+        }
+        else if (!Enum.IsDefined(ChannelRouting))
+        {
+            message = $"ChannelRouting value {(int)ChannelRouting} is not valid.";
         }
 
         return message is null;

@@ -1,6 +1,24 @@
+x-server-environment: &server-environment
+  ASPNETCORE_ENVIRONMENT: Production
+  Logging__LogLevel__Default: Warning
+  BACKPLANE: ${BACKPLANE:-none}
+  # PerTarget or Shared; postgres backplane only. Every server gets the same value.
+  CHANNEL_ROUTING: ${CHANNEL_ROUTING:-PerTarget}
+  # ConnectionStrings__Redis: redis:6379
+  ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
+
+x-server: &server
+  build:
+    context: .
+    dockerfile: benchmarks/PostgreSignalR.Benchmarks.Server/Dockerfile
+  environment: *server-environment
+  depends_on:
+    - postgres
+    # - redis
+
 services:
   postgres:
-    image: postgres:16
+    image: ${POSTGRES_IMAGE:-postgres:16}
     environment:
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
@@ -14,37 +32,43 @@ services:
   #     - "6379:6379"
 
   servera:
-    build:
-      context: .
-      dockerfile: benchmarks/PostgreSignalR.Benchmarks.Server/Dockerfile
+    <<: *server
     environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      Logging__LogLevel__Default: Warning
-      BACKPLANE: ${BACKPLANE:-none}
-      # ConnectionStrings__Redis: redis:6379
-      ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
+      <<: *server-environment
       MAKETABLE: true
-    depends_on:
-      - postgres
-      # - redis
     ports:
       - "8081:8080"
 
   serverb:
-    build:
-      context: .
-      dockerfile: benchmarks/PostgreSignalR.Benchmarks.Server/Dockerfile
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      Logging__LogLevel__Default: Warning
-      BACKPLANE: ${BACKPLANE:-none}
-      # ConnectionStrings__Redis: redis:6379
-      ConnectionStrings__Postgres: Host=postgres;Database=bench;Username=postgres;Password=postgres
-    depends_on:
-      - postgres
-      # - redis
+    <<: *server
     ports:
       - "8082:8080"
+
+  # Extra servers, off by default. `--profile servers4` adds serverc and serverd, `--profile servers6` adds serverc to serverf.
+  # The driver only uses them when they're listed in SERVERS.
+  serverc:
+    <<: *server
+    profiles: [servers4, servers6]
+    ports:
+      - "8083:8080"
+
+  serverd:
+    <<: *server
+    profiles: [servers4, servers6]
+    ports:
+      - "8084:8080"
+
+  servere:
+    <<: *server
+    profiles: [servers6]
+    ports:
+      - "8085:8080"
+
+  serverf:
+    <<: *server
+    profiles: [servers6]
+    ports:
+      - "8086:8080"
 
   driver:
     build:
@@ -53,13 +77,29 @@ services:
     environment:
       SERVER_A: http://servera:8080
       SERVER_B: http://serverb:8080
+      # Comma separated; replaces SERVER_A/SERVER_B when set. The first server publishes, clients connect to the rest.
+      SERVERS: ${SERVERS:-}
       MODE: ${MODE:-single}
+      TARGET: ${TARGET:-all}
       CLIENTS: ${CLIENTS:-500}
       PUBLISH_COUNT: ${PUBLISH_COUNT:-20000}
       CONCURRENCY: ${CONCURRENCY:-128}
       PAYLOAD_BYTES: ${PAYLOAD_BYTES:-128}
       WARMUP_SECONDS: ${WARMUP_SECONDS:-10}
       MEASURE_SECONDS: ${MEASURE_SECONDS:-30}
+      TARGET_RATE: ${TARGET_RATE:-100}
+      SLO_P99_MS: ${SLO_P99_MS:-250}
+      SWEEP_START_RATE: ${SWEEP_START_RATE:-100}
+      SWEEP_STEP_RATE: ${SWEEP_STEP_RATE:-100}
+      SWEEP_MAX_RATE: ${SWEEP_MAX_RATE:-2000}
+      SWEEP_TRIAL_SECONDS: ${SWEEP_TRIAL_SECONDS:-15}
+      BATCH_SIZE: ${BATCH_SIZE:-25}
+      # Default: one user per client
+      USER_COUNT: ${USER_COUNT:-}
+      GROUP_COUNT: ${GROUP_COUNT:-10}
+      CHURN_CONCURRENCY: ${CHURN_CONCURRENCY:-16}
+      # Default: MEASURE_SECONDS
+      CHURN_SECONDS: ${CHURN_SECONDS:-}
     depends_on:
       - servera
       - serverb

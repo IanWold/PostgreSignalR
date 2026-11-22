@@ -25,7 +25,7 @@ public class PostgresRestartFixture(ContainerFixture containerFixture) : IAsyncL
 
         await _network.CreateAsync();
 
-        _postgresContainer = new ContainerBuilder("postgres:16")
+        _postgresContainer = new ContainerBuilder(ContainerFixture.PostgresImage)
             .WithNetwork(_network)
             .WithNetworkAliases("postgres_network")
             .WithEnvironment("POSTGRES_USER", PostgresUser)

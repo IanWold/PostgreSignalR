@@ -18,6 +18,9 @@ public class TestClient(HubConnection connection) : IAsyncDisposable
     public IServer Send =>
         _serverProxy ?? throw new Exception("Not initialized!");
 
+    public string ConnectionId =>
+        connection.ConnectionId ?? throw new Exception("Not connected!");
+
     private Task ReceiverCallback(string key, object?[] args)
     {
         if (_waiters.TryGetValue(key, out var queue))

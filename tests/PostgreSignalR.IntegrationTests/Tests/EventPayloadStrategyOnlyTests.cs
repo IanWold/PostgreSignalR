@@ -2,7 +2,7 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class EventPayloadStrategyOnlyTests(ContainerFixture fixture) : ConfigurableBaseTest(fixture, new(UseTableStrategy: false))
+public abstract class EventPayloadStrategyOnlyTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
     public async Task Broadcast_AllServersReceive()
@@ -40,3 +40,7 @@ public class EventPayloadStrategyOnlyTests(ContainerFixture fixture) : Configura
         await outsider.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }
+
+public sealed class PerTargetEventPayloadStrategyOnlyTests(ContainerFixture fixture) : EventPayloadStrategyOnlyTests(fixture, new(UseTableStrategy: false));
+
+public sealed class SharedEventPayloadStrategyOnlyTests(ContainerFixture fixture) : EventPayloadStrategyOnlyTests(fixture, new(UseTableStrategy: false, ChannelRouting: ChannelRouting.Shared));
