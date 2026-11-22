@@ -8,18 +8,21 @@ namespace PostgreSignalR;
 
 internal abstract class ChannelNameProvider
 {
+    private readonly string _scope;
+
     /// <param name="returnServerName">The name of this server, used for its return results channel.</param>
     /// <param name="hubScope">
-    /// When set, scopes the channels shared between servers (<see cref="All"/>, <see cref="GroupManagement"/> and <see cref="Shared"/>)
-    /// to one hub, so hubs on the same backplane don't receive each other's messages. See <see cref="GetHubScope"/>.
+    /// When set, scopes the channels shared between servers (<see cref="All"/>, <see cref="GroupManagement"/>, <see cref="Shared"/>,
+    /// and the connection, group and user channels) to one hub, so hubs on the same backplane don't receive each other's messages.
+    /// See <see cref="GetHubScope"/>.
     /// </param>
     public ChannelNameProvider(string returnServerName, string? hubScope = null)
     {
-        var scope = hubScope is null ? string.Empty : $"{hubScope}_";
+        _scope = hubScope is null ? string.Empty : $"{hubScope}_";
 
-        All = Normalize($"{scope}all");
-        GroupManagement = Normalize($"{scope}grp_mgm");
-        Shared = Normalize($"{scope}shared");
+        All = Normalize($"{_scope}all");
+        GroupManagement = Normalize($"{_scope}grp_mgm");
+        Shared = Normalize($"{_scope}shared");
         ReturnResults = Normalize($"ret_{returnServerName}");
     }
 
@@ -70,21 +73,21 @@ internal abstract class ChannelNameProvider
     /// </summary>
     /// <param name="connectionId">The ID of the connection to get the channel for.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string Connection(string connectionId) => Normalize($"con_{connectionId}");
+    public string Connection(string connectionId) => Normalize($"{_scope}con_{connectionId}");
 
     /// <summary>
     /// Gets the name of the channel for sending a message to a named group of connections.
     /// </summary>
     /// <param name="groupName">The name of the group to get the channel for.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string Group(string groupName) => Normalize($"grp_{groupName}");
+    public string Group(string groupName) => Normalize($"{_scope}grp_{groupName}");
 
     /// <summary>
     /// Gets the name of the channel for sending a message to all collections associated with a user.
     /// </summary>
-    /// <param name="userId">The ID of the user to get the channel for.</param>32
+    /// <param name="userId">The ID of the user to get the channel for.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string User(string userId) => Normalize($"usr_{userId}");
+    public string User(string userId) => Normalize($"{_scope}usr_{userId}");
 
     /// <summary>
     /// Gets the name of the acknowledgement channel for the specified server.

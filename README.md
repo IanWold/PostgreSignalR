@@ -48,6 +48,7 @@ builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
     options.Prefix = "myapp";
     options.ChannelNameNormaization = ChannelNameNormaization.Truncate;
     options.ChannelRouting = ChannelRouting.PerTarget;
+    options.ScopeChannelsByHub = true;
     options.OnInitialized += () => { /* Do something */ };
     options.OnReconnected += () => { /* Do something */ };
 });
@@ -65,6 +66,17 @@ builder.Services.AddSignalR()
 ```
 
 The hubs you don't add use SignalR's default lifetime manager, so their messages only reach connections on the same server and their connections never touch Postgres. This helps when some hubs never need to send messages between servers, like the circuit hub in a Blazor Server app.
+
+With the default `PerTarget` routing, the hubs on the backplane share channels, so a message sent to all connections, a user, or a group through one hub also reaches the matching connections of every other hub. Clients ignore methods they don't handle, but they still receive the messages. Set `ScopeChannelsByHub` to give each hub its own channels:
+
+```csharp
+builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
+{
+    options.ScopeChannelsByHub = true;
+});
+```
+
+Servers with different values don't exchange messages, so turning this on is like changing the prefix: switch every server at once, or expect messages between old and new servers to be lost during the rollout. `Shared` routing always gives each hub its own channels, so this has no effect there.
 
 ### Channel Routing
 

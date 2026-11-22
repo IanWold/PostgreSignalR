@@ -89,6 +89,18 @@ public class PostgresBackplaneOptions
     public ChannelRouting ChannelRouting { get; set; } = ChannelRouting.PerTarget;
 
     /// <summary>
+    /// Configures whether each hub gets its own channels, so hubs on the same backplane don't receive each other's messages.
+    /// Default: <c>false</c>
+    /// </summary>
+    /// <remarks>
+    /// Without this, every hub using <see cref="ChannelRouting.PerTarget"/> shares the same channels, so a message sent to all connections,
+    /// a user or a group through one hub also reaches matching connections of every other hub on the backplane.
+    /// This has no effect with <see cref="ChannelRouting.Shared"/>, which always gives each hub its own channels.
+    /// Servers with different values don't exchange messages, so every server sharing a <see cref="Prefix"/> must use the same value.
+    /// </remarks>
+    public bool ScopeChannelsByHub { get; set; }
+
+    /// <summary>
     /// Configures the <see href="https://www.npgsql.org/doc/api/Npgsql.NpgsqlDataSource.html">NpgsqlDataSource</see> to connect to the Postgres database.
     /// </summary>
     /// <remarks>
