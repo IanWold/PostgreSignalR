@@ -37,6 +37,17 @@ internal enum GroupAction : byte
 
 internal record struct PostgresCompletion(string ProtocolName, ReadOnlySequence<byte> CompletionMessage);
 
+internal enum RoutingTarget : byte
+{
+    // These numbers are used by the protocol, do not change them and always use explicit assignment when adding new items to this enum.
+    // 0 is intentionally omitted
+    Connection = 1,
+    Group = 2,
+    User = 3,
+}
+
+internal readonly record struct RoutingHeader(RoutingTarget RoutingTarget, IReadOnlyList<string> Ids);
+
 internal sealed class PostgresProtocol
 {
     private readonly List<IHubProtocol> _hubProtocols;
@@ -66,6 +77,8 @@ internal sealed class PostgresProtocol
     // The Postgres Protocol:
     // * The message type is known in advance because messages are sent to different channels based on type
     // * Invocations are sent to the All, Group, Connection and User channels
+    // * Under shared channel routing, invocations for connections, users and groups are sent to the Shared channel
+    //   instead, with a routing header saying which targets they're for. See WriteRoutingHeader.
     // * Group Commands are sent to the GroupManagement channel
     // * Acks are sent to the Acknowledgement channel.
     // * Completion messages (client results) are sent to the server specific Result channel
@@ -208,6 +221,137 @@ internal sealed class PostgresProtocol
 
         msgPackWriter.Flush();
         return writer.ToArray();
+    }
+
+    /// <summary>
+    /// Separates the routing header from the payload strategy's own text in a notification payload.
+    /// It is not in the base64 alphabet, so it can't appear in the header.
+    /// </summary>
+    public const char RoutingHeaderSeparator = '.';
+
+    public static string WriteRoutingHeader(RoutingTarget target, string id)
+    {
+        // Written as the base64 encoding of the routing header (see WriteRoutingHeader(ref MessagePackWriter...)),
+        // followed by RoutingHeaderSeparator. Payload strategies that support routing headers put this text
+        // in front of their own text in the notification payload, so a receiver can read the header without
+        // resolving the payload. Base64 keeps the text ASCII, so its length in characters is its length in bytes.
+
+        var memoryBufferWriter = MemoryBufferWriter.Get();
+        try
+        {
+            var writer = new MessagePackWriter(memoryBufferWriter);
+            WriteRoutingHeader(ref writer, target, id);
+            writer.Flush();
+
+            return Convert.ToBase64String(memoryBufferWriter.ToArray()) + RoutingHeaderSeparator;
+        }
+        finally
+        {
+            MemoryBufferWriter.Return(memoryBufferWriter);
+        }
+    }
+
+    /// <summary>
+    /// Reads the routing header from the front of a notification payload.
+    /// </summary>
+    /// <returns>The index in <paramref name="notificationPayload"/> where the payload strategy's own text starts.</returns>
+    public static int ReadRoutingHeader(string notificationPayload, out RoutingHeader header)
+    {
+        // See WriteRoutingHeader(RoutingTargetKind, string) for the format
+        var separator = notificationPayload.IndexOf(RoutingHeaderSeparator);
+        if (separator < 0)
+        {
+            throw new InvalidDataException("Notification payload has no routing header.");
+        }
+
+        var reader = new MessagePackReader(Convert.FromBase64String(notificationPayload[..separator]));
+        header = ReadRoutingHeader(ref reader);
+
+        return separator + 1;
+    }
+
+    public static byte[] WriteRoutedMessage(RoutingTarget target, string id, byte[] message)
+    {
+        // Used when the payload strategy doesn't support routing headers, so the header travels inside the message.
+        // Written as a MessagePack 'arr' containing at least these items:
+        // * The routing header (see WriteRoutingHeader(ref MessagePackWriter...)), which is an 'arr'
+        // * A 'bin': the message, as written by WriteInvocation
+        // Any additional items are discarded.
+
+        var memoryBufferWriter = MemoryBufferWriter.Get();
+        try
+        {
+            var writer = new MessagePackWriter(memoryBufferWriter);
+
+            writer.WriteArrayHeader(2);
+            WriteRoutingHeader(ref writer, target, id);
+            writer.Write(message);
+            writer.Flush();
+
+            return memoryBufferWriter.ToArray();
+        }
+        finally
+        {
+            MemoryBufferWriter.Return(memoryBufferWriter);
+        }
+    }
+
+    /// <summary>
+    /// Reads a message written by <see cref="WriteRoutedMessage"/>.
+    /// </summary>
+    /// <returns>The message, as written by <see cref="WriteInvocation"/>.</returns>
+    public static ReadOnlyMemory<byte> ReadRoutedMessage(ReadOnlyMemory<byte> data, out RoutingHeader header)
+    {
+        // See WriteRoutedMessage for the format
+        var reader = new MessagePackReader(data);
+        var length = ValidateArraySize(ref reader, 2, "RoutedMessage");
+
+        header = ReadRoutingHeader(ref reader);
+
+        var message = reader.ReadBytes() ?? throw new InvalidDataException("RoutedMessage has no message.");
+
+        SkipRemaining(ref reader, length - 2);
+
+        return message.IsSingleSegment ? message.First : message.ToArray();
+    }
+
+    private static void WriteRoutingHeader(ref MessagePackWriter writer, RoutingTarget target, string id)
+    {
+        // Written as a MessagePack 'arr' containing at least these items:
+        // * An 'int': the target kind (a single-byte fixnum)
+        // * A MessagePack 'arr' of 'str's: the target ids. The connection ID, user ID or group name, unnormalized.
+        // Any additional items are discarded.
+
+        writer.WriteArrayHeader(2);
+        writer.Write((byte)target);
+        writer.WriteArrayHeader(1);
+        writer.Write(id ?? string.Empty);
+    }
+
+    private static RoutingHeader ReadRoutingHeader(ref MessagePackReader reader)
+    {
+        var length = ValidateArraySize(ref reader, 2, "RoutingHeader");
+
+        var target = (RoutingTarget)reader.ReadByte();
+
+        var idCount = reader.ReadArrayHeader();
+        var ids = new string[idCount];
+        for (var i = 0; i < idCount; i++)
+        {
+            ids[i] = reader.ReadString() ?? string.Empty;
+        }
+
+        SkipRemaining(ref reader, length - 2);
+
+        return new RoutingHeader(target, ids);
+    }
+
+    private static void SkipRemaining(ref MessagePackReader reader, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            reader.Skip();
+        }
     }
 
     public static PostgresInvocation ReadInvocation(ReadOnlyMemory<byte> data)

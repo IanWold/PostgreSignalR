@@ -13,7 +13,7 @@ public abstract class ResiliencyTestBase(ContainerFixture fixture, BackplaneTest
             """
             SELECT pg_terminate_backend(pid)
             FROM pg_stat_activity
-            WHERE datname = current_database() AND state = 'idle' AND query ILIKE 'LISTEN %';
+            WHERE datname = current_database() AND state = 'idle' AND (query ILIKE 'LISTEN %' OR query ILIKE 'UNLISTEN %');
             """,
             connection
         );

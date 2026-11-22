@@ -2,9 +2,10 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class PayloadTableAlwaysStorageTests(ContainerFixture fixture) : ConfigurableBaseTest(fixture, new(PayloadTableStorage: PayloadTableStorage.Always))
+public abstract class PayloadTableAlwaysStorageTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task Broadcast_ShortMessageStillDelivered()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -20,6 +21,7 @@ public class PayloadTableAlwaysStorageTests(ContainerFixture fixture) : Configur
     }
 
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task Connection_TargetsSingleConnection()
     {
         await using var sender = await Server1.CreateClientAsync();
@@ -37,3 +39,7 @@ public class PayloadTableAlwaysStorageTests(ContainerFixture fixture) : Configur
         await bystander.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }
+
+public sealed class PerTargetPayloadTableAlwaysStorageTests(ContainerFixture fixture) : PayloadTableAlwaysStorageTests(fixture, new(PayloadTableStorage: PayloadTableStorage.Always));
+
+public sealed class SharedPayloadTableAlwaysStorageTests(ContainerFixture fixture) : PayloadTableAlwaysStorageTests(fixture, new(PayloadTableStorage: PayloadTableStorage.Always, ChannelRouting: ChannelRouting.Shared));

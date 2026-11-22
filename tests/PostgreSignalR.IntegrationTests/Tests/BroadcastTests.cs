@@ -2,7 +2,7 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
+public abstract class BroadcastTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
     public async Task CallerOnly_DoesNotReachOthers()
@@ -37,6 +37,7 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
     }
 
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task Broadcast_AllExceptOneDoesNotReachExcluded()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -56,3 +57,7 @@ public class BroadcastTests(ContainerFixture fixture) : BaseTest(fixture)
         await excluded.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }
+
+public sealed class PerTargetBroadcastTests(ContainerFixture fixture) : BroadcastTests(fixture, BackplaneTestConfiguration.Default);
+
+public sealed class SharedBroadcastTests(ContainerFixture fixture) : BroadcastTests(fixture, BackplaneTestConfiguration.Shared);

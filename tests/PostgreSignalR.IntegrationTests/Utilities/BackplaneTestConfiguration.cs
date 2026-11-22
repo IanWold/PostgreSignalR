@@ -2,7 +2,7 @@ namespace PostgreSignalR.IntegrationTests;
 
 /// <summary>
 /// Describes a non-default backplane configuration for a test server pair. Instances are compared by value,
-/// so <see cref="ContainerFixture.GetServerPairAsync"/> can use a configuration as a cache key to reuse the
+/// so <see cref="ContainerFixture.GetServerPairAsync(BackplaneTestConfiguration)"/> can use a configuration as a cache key to reuse the
 /// same server pair across every test that requests the same configuration.
 /// </summary>
 public sealed record BackplaneTestConfiguration(
@@ -12,10 +12,17 @@ public sealed record BackplaneTestConfiguration(
     PayloadTableStorage? PayloadTableStorage = null,
     bool? AutomaticCleanup = null,
     int? AutomaticCleanupTtlMs = null,
-    int? AutomaticCleanupIntervalMs = null
+    int? AutomaticCleanupIntervalMs = null,
+    ChannelRouting? ChannelRouting = null,
+    CustomPayloadStrategy? CustomPayloadStrategy = null
 )
 {
     public static BackplaneTestConfiguration Default { get; } = new();
+
+    /// <summary>
+    /// The default configuration, with <see cref="PostgreSignalR.ChannelRouting.Shared"/> routing.
+    /// </summary>
+    public static BackplaneTestConfiguration Shared { get; } = new(ChannelRouting: PostgreSignalR.ChannelRouting.Shared);
 
     internal IReadOnlyDictionary<string, string> ToEnvironmentVariables()
     {
@@ -23,6 +30,11 @@ public sealed record BackplaneTestConfiguration(
         {
             ["UseTableStrategy"] = UseTableStrategy.ToString()
         };
+
+        if (CustomPayloadStrategy is not null)
+        {
+            environment["CustomPayloadStrategy"] = CustomPayloadStrategy.Value.ToString();
+        }
 
         if (Prefix is not null)
         {
@@ -32,6 +44,11 @@ public sealed record BackplaneTestConfiguration(
         if (ChannelNameNormaization is not null)
         {
             environment["Backplane__ChannelNameNormaization"] = ChannelNameNormaization.Value.ToString();
+        }
+
+        if (ChannelRouting is not null)
+        {
+            environment["Backplane__ChannelRouting"] = ChannelRouting.Value.ToString();
         }
 
         if (PayloadTableStorage is not null)
@@ -56,4 +73,20 @@ public sealed record BackplaneTestConfiguration(
 
         return environment;
     }
+}
+
+/// <summary>
+/// A payload strategy defined in the test app rather than the library, as an app's own would be.
+/// </summary>
+public enum CustomPayloadStrategy
+{
+    /// <summary>
+    /// Implements only <see cref="IPayloadStrategy"/>.
+    /// </summary>
+    Plain,
+
+    /// <summary>
+    /// Implements <see cref="IPrefixedPayloadStrategy"/>.
+    /// </summary>
+    Prefixed
 }

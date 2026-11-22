@@ -2,7 +2,7 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class MultipleProtocolsTests(ContainerFixture fixture) : BaseTest(fixture)
+public abstract class MultipleProtocolsTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
     public async Task Broadcast_ReachesBothJsonAndMessagePackClients()
@@ -40,3 +40,7 @@ public class MultipleProtocolsTests(ContainerFixture fixture) : BaseTest(fixture
         await outsider.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }
+
+public sealed class PerTargetMultipleProtocolsTests(ContainerFixture fixture) : MultipleProtocolsTests(fixture, BackplaneTestConfiguration.Default);
+
+public sealed class SharedMultipleProtocolsTests(ContainerFixture fixture) : MultipleProtocolsTests(fixture, BackplaneTestConfiguration.Shared);

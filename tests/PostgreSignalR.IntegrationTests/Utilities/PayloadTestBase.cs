@@ -1,6 +1,6 @@
 namespace PostgreSignalR.IntegrationTests;
 
-public abstract class PayloadTestBase<TPayload>(ContainerFixture fixture) : BaseTest(fixture)
+public abstract class PayloadTestBase<TPayload>(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     protected abstract TPayload Payload { get; }
     protected abstract string MessageKey { get; }

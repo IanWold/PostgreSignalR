@@ -6,3 +6,5 @@ This example extends the custom table example by adding an AFTER INSERT trigger 
 
 * Program.cs shows how to register the custom strategy, and
 * Migrations/1_CreatePayloadTable.sql contains notes on the table implementation.
+
+Because the trigger builds the notification payload, this strategy can't put a prefix at the start of it, so it doesn't implement `IPrefixedPayloadStrategy`. It still works with `ChannelRouting.Shared`, but every server reads every connection, user and group payload from the table. A strategy that calls `pg_notify` itself can implement `IPrefixedPayloadStrategy` to avoid that.

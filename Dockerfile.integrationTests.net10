@@ -1,5 +1,6 @@
 # Build Stage
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Builds with the .NET 11 SDK, as the published package does, and runs on the .NET 10 runtime below.
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /work
 
 COPY ./src ./src

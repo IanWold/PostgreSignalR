@@ -2,7 +2,7 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class StringPayloadTests(ContainerFixture fixture) : PayloadTestBase<string>(fixture)
+public abstract class StringPayloadTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : PayloadTestBase<string>(fixture, configuration)
 {
     protected override string Payload =>
         ShortMessage;
@@ -22,3 +22,7 @@ public class StringPayloadTests(ContainerFixture fixture) : PayloadTestBase<stri
     protected override Task SendToUsersAsync(TestClient sender, string[] userIds, string payload) =>
         sender.Send.SendToUsers(userIds, payload);
 }
+
+public sealed class PerTargetStringPayloadTests(ContainerFixture fixture) : StringPayloadTests(fixture, BackplaneTestConfiguration.Default);
+
+public sealed class SharedStringPayloadTests(ContainerFixture fixture) : StringPayloadTests(fixture, BackplaneTestConfiguration.Shared);

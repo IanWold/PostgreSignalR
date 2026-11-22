@@ -1,3 +1,6 @@
+using System.Net.Http.Json;
+using PostgreSignalR.IntegrationTests.Abstractions;
+
 namespace PostgreSignalR.IntegrationTests;
 
 public class TestServer(TestServerContainer container) : IAsyncDisposable
@@ -44,6 +47,20 @@ public class TestServer(TestServerContainer container) : IAsyncDisposable
             await client.DisposeAsync();
             throw;
         }
+    }
+
+    public async Task<ListenerDiagnostics> GetListenerDiagnosticsAsync()
+    {
+        using var httpClient = new HttpClient();
+        return await httpClient.GetFromJsonAsync<ListenerDiagnostics>(container.ListenerDiagnosticsUri)
+            ?? throw new InvalidOperationException("Listener diagnostics were empty.");
+    }
+
+    public async Task<PayloadDiagnostics> GetPayloadDiagnosticsAsync()
+    {
+        using var httpClient = new HttpClient();
+        return await httpClient.GetFromJsonAsync<PayloadDiagnostics>(container.PayloadDiagnosticsUri)
+            ?? throw new InvalidOperationException("Payload diagnostics were empty.");
     }
 
     public async Task RestartAsync()

@@ -30,13 +30,42 @@ builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
 {
     options.Prefix = "myapp";
     options.ChannelNameNormaization = ChannelNameNormaization.Truncate;
+    options.ChannelRouting = ChannelRouting.PerTarget;
     options.OnInitialized += () => { /* Do something */ }
 });
 ```
 
+### Channel Routing
+
+By default, each server LISTENs on a Postgres channel for each of its connections, users and groups, so it only receives the messages for its own targets. That means connecting, disconnecting, and the first join or last leave of a group on a server each run a LISTEN or UNLISTEN.
+
+Setting `ChannelRouting` to `Shared` sends every connection, user and group message over one shared channel instead. Each server LISTENs on the same five channels however many connections it holds, and delivers each message to its own connections from memory:
+
+```csharp
+builder.Services.AddSignalR().AddPostgresBackplane(dataSource, options =>
+{
+    options.ChannelRouting = ChannelRouting.Shared;
+});
+```
+
+|  | `PerTarget` (default) | `Shared` |
+| --- | --- | --- |
+| Channels per server | 4, plus one per local connection, user and group | 5 |
+| Connecting, disconnecting, joining and leaving groups | Runs LISTEN or UNLISTEN | Doesn't touch Postgres |
+| Which servers receive a connection, user or group message | Those holding the target | Every server |
+
+`Shared` suits apps with many connections or groups per server, or frequent connects and disconnects, running on a handful of servers. `PerTarget` suits many servers with heavy targeted traffic, since each server only receives its own targets' messages.
+
+A few things to know about `Shared`:
+
+* **Every server sharing a prefix must use the same routing.** Servers with different routing don't exchange messages, so switching is like changing the prefix: switch every server at once, or expect messages between old and new servers to be lost during the rollout.
+* **Each hub gets its own channels**, so hubs on the same backplane don't receive each other's messages.
+* **The user ID or group name travels in each notification**, so it counts toward the notification size limit described below.
+* **A server only resolves a payload when it holds one of the message's targets**, so with the payload table strategy, servers only read the stored payloads they need. A custom payload strategy gets the same by implementing `IPrefixedPayloadStrategy` (see below); otherwise every server resolves every connection, user and group payload.
+
 ### Payload Strategies
 
-By default, PostgreSignalR will send message payloads within the notification event payload in Postgres. Postgres limits the size of these payloads to 8kb. This limit is more than enough for most use cases, but PostgreSignalR does include a mechanism to handle payloads of any size by storing the payloads in a table and only passing references to that table in the notification event payload.
+By default, PostgreSignalR will send message payloads within the notification event payload in Postgres. Postgres limits these payloads to less than 8000 bytes, which fits messages of up to 5997 bytes once encoded. This limit is more than enough for most use cases, but PostgreSignalR does include a mechanism to handle payloads of any size by storing the payloads in a table and only passing references to that table in the notification event payload.
 
 ```csharp
 builder.Services.AddSignalR()
@@ -73,7 +102,22 @@ var app = builder.Build();
 await app.InitializePostgresBackplanePayloadTableAsync();
 ```
 
-For more advanced use cases, PostgreSignalR allows you to create a custom payload strategy.
+For more advanced use cases, PostgreSignalR allows you to create a custom payload strategy by implementing `IPayloadStrategy`.
+
+If you use `ChannelRouting.Shared` with a custom payload strategy, implement `IPrefixedPayloadStrategy` as well. The backplane then passes a prefix that says which targets a message is for, and a server that holds none of them skips resolving the payload. Your strategy only needs to put the prefix, unchanged, at the start of the notification payload, and it gets its own text back without the prefix. The prefix is ASCII and counts toward the notification size limit:
+
+```csharp
+public class MyPayloadStrategy : IPrefixedPayloadStrategy
+{
+    // IPayloadStrategy.NotifyAsync and ResolveNotificationPayload, as before...
+
+    public Task NotifyAsync(string channelName, string payloadPrefix, byte[] message, CancellationToken ct = default) =>
+        NotifyWithPayloadAsync(channelName, payloadPrefix + MyEncode(message), ct);
+
+    public byte[] ResolveNotificationPayload(string payload) =>
+        MyDecode(payload);
+}
+```
 
 # Roadmap
 
@@ -81,9 +125,11 @@ PostgreSignalR is ready for production use: it supports all SignalR features, is
 
 ## Versioning
 
-PostgreSignalR follows [Semantic Versioning](https://semver.org/). The public API consists of the dependency injection extensions, the options classes (`PostgresBackplaneOptions` and `PayloadTableOptions`), and the payload strategy types (`IPayloadStrategy`, `EventPayloadStrategy`, and `TablePayloadStrategy`). Breaking changes to any of these will only be made in a new major version.
+PostgreSignalR follows [Semantic Versioning](https://semver.org/). The public API consists of the dependency injection extensions, the options classes (`PostgresBackplaneOptions` and `PayloadTableOptions`), and the payload strategy types (`IPayloadStrategy`, `IPrefixedPayloadStrategy`, `EventPayloadStrategy`, and `TablePayloadStrategy`). Breaking changes to any of these will only be made in a new major version.
 
 PostgreSignalR targets every version of .NET that is [currently supported by Microsoft](https://dotnet.microsoft.com/en-us/platform/support/policy/dotnet-core). Support for new .NET versions is added in minor versions, and support for a .NET version is dropped in a new major version once Microsoft stops supporting it.
+
+PostgreSignalR supports every PostgreSQL version that is [currently supported by the PostgreSQL Global Development Group](https://www.postgresql.org/support/versioning/).
 
 ## Next Steps
 
@@ -124,7 +170,7 @@ public async Task Test()
 
 To build, all you'll need is [the .NET 11 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/11.0). If you're interested in setting up a separate local project to use your development version of this library, you can follow [Microsoft's guide on local Nuget feeds](https://learn.microsoft.com/en-us/nuget/hosting-packages/local-feeds).
 
-In order to execute the tests locally, you'll need to have Docker installed. I recommend installing [Docker Desktop](https://www.docker.com/products/docker-desktop/) for ease of use, but any Docker-compatible container engine/interface should work fine. Docker Desktop works out of the box, for the most part. Your favorite C# IDE should have a test explorer, you can run the tests like normal from there, just be sure Docker is running before you run the tests. If you're using VSCode like I am, I recommend installing [the C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit).
+In order to execute the tests locally, you'll need to have Docker installed. I recommend installing [Docker Desktop](https://www.docker.com/products/docker-desktop/) for ease of use, but any Docker-compatible container engine/interface should work fine. Docker Desktop works out of the box, for the most part. Your favorite C# IDE should have a test explorer, you can run the tests like normal from there, just be sure Docker is running before you run the tests. The integration tests run against Postgres 16 by default; set the `POSTGRES_IMAGE` environment variable (for example, to `postgres:19`) to run them against another version. If you're using VSCode like I am, I recommend installing [the C# Dev Kit](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit).
 
 # Contributing
 

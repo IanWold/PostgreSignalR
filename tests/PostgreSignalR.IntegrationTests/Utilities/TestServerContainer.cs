@@ -10,6 +10,12 @@ public class TestServerContainer(IContainer container) : IAsyncDisposable
     public Uri HealthUri =>
         new($"http://localhost:{container.GetMappedPublicPort(8080)}/health");
 
+    public Uri ListenerDiagnosticsUri =>
+        new($"http://localhost:{container.GetMappedPublicPort(8080)}/diagnostics/listener");
+
+    public Uri PayloadDiagnosticsUri =>
+        new($"http://localhost:{container.GetMappedPublicPort(8080)}/diagnostics/payload");
+
     public Task StopAsync(CancellationToken ct = default) =>
         container.StopAsync(ct);
 

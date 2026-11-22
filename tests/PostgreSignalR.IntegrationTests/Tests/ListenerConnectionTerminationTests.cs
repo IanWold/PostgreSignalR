@@ -2,9 +2,10 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class ListenerConnectionTerminationTests(ContainerFixture fixture) : ResiliencyTestBase(fixture, new(Prefix: "backend-kill"))
+public abstract class ListenerConnectionTerminationTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ResiliencyTestBase(fixture, configuration)
 {
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task BackplaneRecoversAfterListenerConnectionIsTerminated()
     {
         await using var client1 = await Server1.CreateClientAsync();
@@ -38,6 +39,7 @@ public class ListenerConnectionTerminationTests(ContainerFixture fixture) : Resi
     }
 
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task GroupSubscriptionSurvivesReconnect()
     {
         await using var member = await Server1.CreateClientAsync();
@@ -92,3 +94,7 @@ public class ListenerConnectionTerminationTests(ContainerFixture fixture) : Resi
         await AssertEventuallyDeliveredAsync(existingClient, newClient);
     }
 }
+
+public sealed class PerTargetListenerConnectionTerminationTests(ContainerFixture fixture) : ListenerConnectionTerminationTests(fixture, new(Prefix: "backend-kill"));
+
+public sealed class SharedListenerConnectionTerminationTests(ContainerFixture fixture) : ListenerConnectionTerminationTests(fixture, new(Prefix: "backend-kill", ChannelRouting: ChannelRouting.Shared));

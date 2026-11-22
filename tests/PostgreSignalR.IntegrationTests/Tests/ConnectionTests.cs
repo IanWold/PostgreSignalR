@@ -2,7 +2,7 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
+public abstract class ConnectionTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
     public async Task Connection_TargetsSingleConnection_SameServer()
@@ -23,6 +23,7 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
     }
 
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task Connections_TargetsMultiple()
     {
         await using var sender = await Server1.CreateClientAsync();
@@ -41,3 +42,7 @@ public class ConnectionTests(ContainerFixture fixture) : BaseTest(fixture)
         Assert.Equal(ShortMessage, (await messageFromTarget2).Arg<string>());
     }
 }
+
+public sealed class PerTargetConnectionTests(ContainerFixture fixture) : ConnectionTests(fixture, BackplaneTestConfiguration.Default);
+
+public sealed class SharedConnectionTests(ContainerFixture fixture) : ConnectionTests(fixture, BackplaneTestConfiguration.Shared);

@@ -1,7 +1,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 
-# Copy the rest of the source
+# Copy the library (the server references it as a project) and the rest of the source
+COPY src/ src/
 COPY benchmarks/ benchmarks/
 
 # Restore just the server project (pulls in contracts)

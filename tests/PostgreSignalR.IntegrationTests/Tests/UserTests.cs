@@ -2,9 +2,10 @@ using PostgreSignalR.IntegrationTests.Abstractions;
 
 namespace PostgreSignalR.IntegrationTests;
 
-public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
+public abstract class UserTests(ContainerFixture fixture, BackplaneTestConfiguration configuration) : ConfigurableBaseTest(fixture, configuration)
 {
     [RetryFact]
+    [Trait(Traits.Category, Traits.PostgresCompat)]
     public async Task Users_SendToUserHitsAllConnections()
     {
         await using var user1a = await Server1.CreateClientAsync("u1");
@@ -21,3 +22,7 @@ public class UserTests(ContainerFixture fixture) : BaseTest(fixture)
         await user2.EnsureNoMessageAsync(nameof(IClient.Message));
     }
 }
+
+public sealed class PerTargetUserTests(ContainerFixture fixture) : UserTests(fixture, BackplaneTestConfiguration.Default);
+
+public sealed class SharedUserTests(ContainerFixture fixture) : UserTests(fixture, BackplaneTestConfiguration.Shared);
