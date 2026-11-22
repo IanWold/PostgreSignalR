@@ -14,7 +14,8 @@ public sealed record BackplaneTestConfiguration(
     int? AutomaticCleanupTtlMs = null,
     int? AutomaticCleanupIntervalMs = null,
     ChannelRouting? ChannelRouting = null,
-    CustomPayloadStrategy? CustomPayloadStrategy = null
+    CustomPayloadStrategy? CustomPayloadStrategy = null,
+    BackplaneHubOptIn? BackplaneHubOptIn = null
 )
 {
     public static BackplaneTestConfiguration Default { get; } = new();
@@ -34,6 +35,11 @@ public sealed record BackplaneTestConfiguration(
         if (CustomPayloadStrategy is not null)
         {
             environment["CustomPayloadStrategy"] = CustomPayloadStrategy.Value.ToString();
+        }
+
+        if (BackplaneHubOptIn is not null)
+        {
+            environment["BackplaneHubOptIn"] = BackplaneHubOptIn.Value.ToString();
         }
 
         if (Prefix is not null)
@@ -89,4 +95,20 @@ public enum CustomPayloadStrategy
     /// Implements <see cref="IPrefixedPayloadStrategy"/>.
     /// </summary>
     Prefixed
+}
+
+/// <summary>
+/// Opts the test hub in to the backplane with <c>AddBackplaneHub</c>, leaving the second hub off it.
+/// </summary>
+public enum BackplaneHubOptIn
+{
+    /// <summary>
+    /// Opts in after calling <c>AddPostgresBackplane</c>.
+    /// </summary>
+    AfterAddPostgresBackplane,
+
+    /// <summary>
+    /// Opts in before calling <c>AddPostgresBackplane</c>.
+    /// </summary>
+    BeforeAddPostgresBackplane
 }
