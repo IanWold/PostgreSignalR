@@ -53,9 +53,9 @@ public class TestServer(TestServerContainer container) : IAsyncDisposable
     /// Connects a client to the second hub. The health endpoint only says some hub's backplane has initialized,
     /// so this waits for a round trip instead, which the server answers only once the hub's lifetime manager has connected the client.
     /// </summary>
-    public async Task<TestClient> CreateSecondHubClientAsync()
+    public async Task<TestClient> CreateSecondHubClientAsync(string? user = null)
     {
-        var client = await TestClient.CreateAsync(container.SecondHubUri);
+        var client = await TestClient.CreateAsync(container.SecondHubUri, user);
 
         try
         {

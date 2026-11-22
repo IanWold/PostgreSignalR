@@ -14,6 +14,7 @@ public sealed record BackplaneTestConfiguration(
     int? AutomaticCleanupTtlMs = null,
     int? AutomaticCleanupIntervalMs = null,
     ChannelRouting? ChannelRouting = null,
+    bool? ScopeChannelsByHub = null,
     CustomPayloadStrategy? CustomPayloadStrategy = null,
     BackplaneHubOptIn? BackplaneHubOptIn = null
 )
@@ -55,6 +56,11 @@ public sealed record BackplaneTestConfiguration(
         if (ChannelRouting is not null)
         {
             environment["Backplane__ChannelRouting"] = ChannelRouting.Value.ToString();
+        }
+
+        if (ScopeChannelsByHub is not null)
+        {
+            environment["Backplane__ScopeChannelsByHub"] = ScopeChannelsByHub.Value.ToString();
         }
 
         if (PayloadTableStorage is not null)

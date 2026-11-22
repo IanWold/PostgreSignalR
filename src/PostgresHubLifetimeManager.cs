@@ -74,7 +74,7 @@ public sealed class PostgresHubLifetimeManager<THub> : HubLifetimeManager<THub>,
             ? string.Empty
             : $"{_options.Prefix.TrimEnd("_")}_";
 
-        var hubScope = _options.ChannelRouting == ChannelRouting.Shared
+        var hubScope = _options.ChannelRouting == ChannelRouting.Shared || _options.ScopeChannelsByHub
             ? ChannelNameProvider.GetHubScope(typeof(THub))
             : null;
 
