@@ -12,6 +12,7 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 var postgresConnectionString = builder.Configuration.GetConnectionString("Postgres") ?? throw new Exception();
 
 var isBackplaneReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+var reconnectedCount = 0;
 
 var backplaneConfiguration = builder.Configuration.GetSection("Backplane");
 var payloadTableConfiguration = builder.Configuration.GetSection("PayloadTable");
@@ -24,6 +25,7 @@ var signalRBuilder = builder.Services.AddSignalR(o => o.EnableDetailedErrors = t
     {
         backplaneConfiguration.Bind(o);
         o.OnInitialized += () => isBackplaneReady.TrySetResult();
+        o.OnReconnected += () => Interlocked.Increment(ref reconnectedCount);
     });
 
 if (customPayloadStrategy == "Plain")
@@ -57,7 +59,7 @@ app.MapGet("/health", () =>
 
 app.MapGet("/diagnostics/listener", (HubLifetimeManager<TestHub> lifetimeManager) =>
     lifetimeManager is PostgresHubLifetimeManager<TestHub> postgresLifetimeManager
-    ? Results.Ok(new ListenerDiagnostics(postgresLifetimeManager.ListenerChannelCount, postgresLifetimeManager.ListenerListenCount))
+    ? Results.Ok(new ListenerDiagnostics(postgresLifetimeManager.ListenerChannelCount, postgresLifetimeManager.ListenerListenCount, Volatile.Read(ref reconnectedCount)))
     : Results.NotFound()
 );
 
